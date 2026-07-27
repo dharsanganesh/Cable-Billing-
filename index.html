@@ -181,7 +181,9 @@
       <button id="langEnBtn" class="on">EN</button>
       <button id="langTaBtn">தமிழ்</button>
     </div>
+    <button class="btn btn-ghost" id="syncBtn">☁ <span id="syncStatusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b98a5;margin-left:2px;"></span> <span id="syncBtnLabel">Cloud Sync</span></button>
     <button class="btn btn-ghost" id="reportBtn">📊 Report</button>
+    <button class="btn btn-ghost" id="staffBtn">👤 Staff</button>
     <button class="btn btn-ghost" id="settingsBtn">⚙ Shop Details</button>
     <button class="btn btn-ghost" id="exportBtn">⬇ Backup</button>
     <button class="btn btn-ghost" id="importBtn">⬆ Restore</button>
@@ -252,13 +254,19 @@
         <div class="status-opt sel-suspended" data-status="suspended" id="optSuspended">Suspended</div>
       </div>
     </div>
-    <div class="field">
-      <label id="lblMode">Collection Mode</label>
-      <select id="fMode">
-        <option value="cash" id="modeCashOpt">Cash</option>
-        <option value="upi" id="modeUpiOpt">UPI</option>
-        <option value="office" id="modeOfficeOpt">Office</option>
-      </select>
+    <div class="row2">
+      <div class="field">
+        <label id="lblMode">Collection Mode</label>
+        <select id="fMode">
+          <option value="cash" id="modeCashOpt">Cash</option>
+          <option value="upi" id="modeUpiOpt">UPI</option>
+          <option value="office" id="modeOfficeOpt">Office</option>
+        </select>
+      </div>
+      <div class="field">
+        <label id="lblCollector">Collected By</label>
+        <select id="fCollector"></select>
+      </div>
     </div>
     <div class="field">
       <label id="lblNotes">Notes (optional)</label>
@@ -322,10 +330,31 @@
   <div class="modal" style="max-width:340px;">
     <button class="close-x" data-close="modeOverlay">✕</button>
     <h2 id="modeTitle">How was this collected?</h2>
+    <div class="field">
+      <label id="lblModeCollector">Collected By</label>
+      <select id="modeCollectorSelect"></select>
+    </div>
     <div class="mode-grid">
       <button data-mode="cash" id="modeCashBtn">💵 Cash</button>
       <button data-mode="upi" id="modeUpiBtn">📲 UPI</button>
       <button data-mode="office" id="modeOfficeBtn">🏢 Office</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Staff Modal -->
+<div class="overlay" id="staffOverlay">
+  <div class="modal">
+    <button class="close-x" data-close="staffOverlay">✕</button>
+    <h2 id="staffTitle">Manage Staff</h2>
+    <div class="sub" id="staffSub">Add the names of members who collect payments</div>
+    <div id="staffList" style="margin-bottom:14px;"></div>
+    <div class="field">
+      <label id="lblNewStaff">New Staff Name</label>
+      <input id="newStaffName" type="text" placeholder="e.g. Kumar" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-accent" id="addStaffBtn">➕ Add Staff</button>
     </div>
   </div>
 </div>
@@ -378,6 +407,34 @@
   </div>
 </div>
 
+<!-- Cloud Sync Modal -->
+<div class="overlay" id="syncOverlay">
+  <div class="modal wide">
+    <button class="close-x" data-close="syncOverlay">✕</button>
+    <h2 id="syncTitle">Cloud Sync</h2>
+    <div class="sub" id="syncSub">Connect both devices to the same live data</div>
+
+    <div class="field">
+      <div id="syncStatusLine" style="font-size:13px;font-weight:700;padding:8px 10px;border-radius:7px;background:#f2f5f8;">●&nbsp; <span id="syncStatusText">Not connected</span></div>
+    </div>
+
+    <div class="field">
+      <label id="lblSyncConfig">Firebase Config (paste the code from your Firebase project)</label>
+      <textarea id="syncConfigInput" rows="5" placeholder='{"apiKey":"...","databaseURL":"...","projectId":"..."}'></textarea>
+    </div>
+    <div class="field">
+      <label id="lblRoomId">Shop Sync Code (make up any word — both devices must use the SAME code)</label>
+      <input id="syncRoomInput" type="text" placeholder="e.g. mycableshop2026" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="syncDisconnectBtn">Disconnect</button>
+      <button class="btn btn-accent" id="syncConnectBtn">Connect</button>
+    </div>
+    <div class="hint" id="syncHelp" style="margin-top:10px;">Both staff members must paste the exact same Firebase Config and the exact same Sync Code for their data to match.</div>
+  </div>
+</div>
+
 <div id="receiptPrintArea"></div>
 
 <script>
@@ -388,6 +445,8 @@
   var SETTINGS_KEY = "cabletv_billing_settings_v1";
   var INVOICE_KEY = "cabletv_billing_invoice_seq_v1";
   var CATEGORIES_KEY = "cabletv_billing_categories_v1";
+  var STAFF_KEY = "cabletv_billing_staff_v1";
+  var SYNC_CONFIG_KEY = "cabletv_billing_sync_config_v1";
   var LANG_KEY = "cabletv_billing_lang_v1";
 
   var DEFAULT_CATEGORIES = [
@@ -396,6 +455,7 @@
     { code:"S", max:200 },
     { code:"M", max:30 }
   ];
+  var DEFAULT_STAFF = ["Office", "Collection"];
 
   var I18N = {
     en:{
@@ -409,7 +469,19 @@
       addTitle:"Add Customer", editTitle:"Edit Customer", boxLabel:"Box",
       lblName:"Customer Name", lblMobile:"Mobile Number", lblAmount:"Plan Amount (₹)",
       lblLastPaid:"Last Paid Date", lblDueDate:"Next Due Date", lblStatus:"Payment Status",
-      lblMode:"Collection Mode", lblNotes:"Notes (optional)",
+      lblMode:"Collection Mode", lblNotes:"Notes (optional)", lblCollector:"Collected By", lblModeCollector:"Collected By",
+      staffBtn:"👤 Staff", staffTitle:"Manage Staff", staffSub:"Add the names of members who collect payments",
+      lblNewStaff:"New Staff Name", addStaffBtn:"➕ Add Staff", staffExists:"This staff name already exists.",
+      staffAdded:"Staff added successfully.", deleteStaffBtn:"Remove", reportByStaff:"Collected by",
+      syncBtnLabel:"Cloud Sync", syncTitle:"Cloud Sync", syncSub:"Connect both devices to the same live data",
+      lblSyncConfig:"Firebase Config (paste the code from your Firebase project)",
+      lblRoomId:"Shop Sync Code (make up any word — both devices must use the SAME code)",
+      connectBtn:"Connect", disconnectBtn:"Disconnect",
+      syncNotConnected:"Not connected", syncConnected:"Connected — data is live", syncConnecting:"Connecting...",
+      syncErrorMsg:"Could not connect. Check your config and internet connection.",
+      syncHelp:"Both staff members must paste the exact same Firebase Config and the exact same Sync Code for their data to match.",
+      syncInvalidConfig:"Please paste a valid Firebase config (copied from your Firebase project settings).",
+      syncNeedRoom:"Please enter a Sync Code.",
       optPaid:"Paid", optUnpaid:"Unpaid", optSuspended:"Suspended",
       modeCash:"Cash", modeUpi:"UPI", modeOffice:"Office",
       removeBtn:"🗑 Remove", billBtn:"🧾 Generate Bill", saveCustomerBtn:"Save Customer",
@@ -444,7 +516,19 @@
       addTitle:"வாடிக்கையாளரைச் சேர்", editTitle:"வாடிக்கையாளரைத் திருத்து", boxLabel:"பாக்ஸ்",
       lblName:"வாடிக்கையாளர் பெயர்", lblMobile:"மொபைல் எண்", lblAmount:"திட்ட தொகை (₹)",
       lblLastPaid:"கடைசியாக செலுத்திய தேதி", lblDueDate:"அடுத்த செலுத்த வேண்டிய தேதி", lblStatus:"கட்டண நிலை",
-      lblMode:"வசூல் முறை", lblNotes:"குறிப்புகள் (விருப்பம்)",
+      lblMode:"வசூல் முறை", lblNotes:"குறிப்புகள் (விருப்பம்)", lblCollector:"யார் வசூலித்தார்", lblModeCollector:"யார் வசூலித்தார்",
+      staffBtn:"👤 ஊழியர்", staffTitle:"ஊழியர்களை நிர்வகி", staffSub:"பணம் வசூலிக்கும் நபர்களின் பெயர்களைச் சேர்க்கவும்",
+      lblNewStaff:"புதிய ஊழியர் பெயர்", addStaffBtn:"➕ ஊழியரைச் சேர்", staffExists:"இந்த பெயர் ஏற்கனவே உள்ளது.",
+      staffAdded:"ஊழியர் வெற்றிகரமாக சேர்க்கப்பட்டார்.", deleteStaffBtn:"நீக்கு", reportByStaff:"வசூலித்தவர்",
+      syncBtnLabel:"கிளவுட் சின்க்", syncTitle:"கிளவுட் சின்க்", syncSub:"இரு சாதனங்களையும் ஒரே நேரடி தரவுடன் இணைக்கவும்",
+      lblSyncConfig:"Firebase கட்டமைப்பு (உங்கள் Firebase திட்டத்திலிருந்து ஒட்டவும்)",
+      lblRoomId:"கடை சின்க் குறியீடு (எந்த வார்த்தையையும் உருவாக்கவும் — இரு சாதனங்களும் ஒரே குறியீட்டைப் பயன்படுத்த வேண்டும்)",
+      connectBtn:"இணை", disconnectBtn:"துண்டி",
+      syncNotConnected:"இணைக்கப்படவில்லை", syncConnected:"இணைக்கப்பட்டது — தரவு நேரடியாக உள்ளது", syncConnecting:"இணைக்கிறது...",
+      syncErrorMsg:"இணைக்க முடியவில்லை. உங்கள் கட்டமைப்பு மற்றும் இணையத்தை சரிபார்க்கவும்.",
+      syncHelp:"இரு ஊழியர்களும் ஒரே Firebase கட்டமைப்பு மற்றும் ஒரே சின்க் குறியீட்டை பயன்படுத்த வேண்டும்.",
+      syncInvalidConfig:"சரியான Firebase கட்டமைப்பை ஒட்டவும்.",
+      syncNeedRoom:"சின்க் குறியீட்டை உள்ளிடவும்.",
       optPaid:"செலுத்தப்பட்டது", optUnpaid:"செலுத்தப்படவில்லை", optSuspended:"இடைநிறுத்தப்பட்டது",
       modeCash:"பணமாக", modeUpi:"UPI", modeOffice:"அலுவலகத்தில்",
       removeBtn:"🗑 நீக்கு", billBtn:"🧾 பில் உருவாக்கு", saveCustomerBtn:"வாடிக்கையாளரை சேமி",
@@ -474,11 +558,13 @@
     data: {},
     settings: { shopName:"My Cable TV Network", address:"", phone:"", upi:"" },
     categories: DEFAULT_CATEGORIES.slice(),
+    staff: DEFAULT_STAFF.slice(),
     lang: "en",
     activeCat: "U",
     activeBox: null,
     searchTerm: ""
   };
+  var fbApp = null, fbDb = null, syncRef = null, syncEnabled = false, isApplyingRemote = false;
 
   function t(key){ return (I18N[state.lang] && I18N[state.lang][key] !== undefined) ? I18N[state.lang][key] : I18N.en[key]; }
 
@@ -487,13 +573,16 @@
     try{ var raw = localStorage.getItem(DATA_KEY); state.data = raw ? JSON.parse(raw) : {}; }catch(e){ state.data = {}; }
     try{ var rawS = localStorage.getItem(SETTINGS_KEY); if(rawS){ state.settings = Object.assign(state.settings, JSON.parse(rawS)); } }catch(e){}
     try{ var rawC = localStorage.getItem(CATEGORIES_KEY); state.categories = rawC ? JSON.parse(rawC) : DEFAULT_CATEGORIES.slice(); }catch(e){ state.categories = DEFAULT_CATEGORIES.slice(); }
+    try{ var rawSt = localStorage.getItem(STAFF_KEY); state.staff = rawSt ? JSON.parse(rawSt) : DEFAULT_STAFF.slice(); }catch(e){ state.staff = DEFAULT_STAFF.slice(); }
+    if(!state.staff.length) state.staff = DEFAULT_STAFF.slice();
     try{ var rawL = localStorage.getItem(LANG_KEY); if(rawL) state.lang = rawL; }catch(e){}
     if(!state.categories.length) state.categories = DEFAULT_CATEGORIES.slice();
     state.activeCat = state.categories[0].code;
   }
-  function saveData(){ localStorage.setItem(DATA_KEY, JSON.stringify(state.data)); }
-  function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); }
-  function saveCategories(){ localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories)); }
+  function saveData(){ localStorage.setItem(DATA_KEY, JSON.stringify(state.data)); pushToCloud(); }
+  function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); pushToCloud(); }
+  function saveCategories(){ localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories)); pushToCloud(); }
+  function saveStaff(){ localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff)); pushToCloud(); }
   function saveLang(){ localStorage.setItem(LANG_KEY, state.lang); }
   function nextInvoiceNumber(){
     var n = parseInt(localStorage.getItem(INVOICE_KEY) || "1000", 10);
@@ -528,6 +617,22 @@
     document.getElementById("lblDueDate").textContent = t("lblDueDate");
     document.getElementById("lblStatus").textContent = t("lblStatus");
     document.getElementById("lblMode").textContent = t("lblMode");
+    document.getElementById("lblCollector").textContent = t("lblCollector");
+    document.getElementById("lblModeCollector").textContent = t("lblModeCollector");
+    document.getElementById("staffBtn").textContent = t("staffBtn");
+    document.getElementById("staffTitle").textContent = t("staffTitle");
+    document.getElementById("staffSub").textContent = t("staffSub");
+    document.getElementById("lblNewStaff").textContent = t("lblNewStaff");
+    document.getElementById("addStaffBtn").textContent = t("addStaffBtn");
+    document.getElementById("syncBtnLabel").textContent = t("syncBtnLabel");
+    document.getElementById("syncTitle").textContent = t("syncTitle");
+    document.getElementById("syncSub").textContent = t("syncSub");
+    document.getElementById("lblSyncConfig").textContent = t("lblSyncConfig");
+    document.getElementById("lblRoomId").textContent = t("lblRoomId");
+    document.getElementById("syncConnectBtn").textContent = t("connectBtn");
+    document.getElementById("syncDisconnectBtn").textContent = t("disconnectBtn");
+    document.getElementById("syncHelp").textContent = t("syncHelp");
+    updateSyncStatus(syncEnabled ? "connected" : "off");
     document.getElementById("lblNotes").textContent = t("lblNotes");
     document.getElementById("optPaid").textContent = t("optPaid");
     document.getElementById("optUnpaid").textContent = t("optUnpaid");
@@ -564,6 +669,7 @@
     document.getElementById("reportSub").textContent = t("reportSub");
     document.getElementById("langEnBtn").classList.toggle("on", state.lang==="en");
     document.getElementById("langTaBtn").classList.toggle("on", state.lang==="ta");
+    populateStaffDropdowns();
     renderAll();
   }
 
@@ -648,6 +754,57 @@
       state.searchTerm = text;
       renderGrid();
     }, false);
+  });
+
+  function populateStaffDropdowns(){
+    var selects = [document.getElementById("fCollector"), document.getElementById("modeCollectorSelect")];
+    selects.forEach(function(sel){
+      var current = sel.value;
+      sel.innerHTML = "";
+      state.staff.forEach(function(name){
+        var opt = document.createElement("option");
+        opt.value = name; opt.textContent = name;
+        sel.appendChild(opt);
+      });
+      if(state.staff.indexOf(current) !== -1) sel.value = current;
+    });
+  }
+
+  document.getElementById("staffBtn").addEventListener("click", function(){
+    renderStaffList();
+    document.getElementById("newStaffName").value = "";
+    showOverlay("staffOverlay");
+  });
+  function renderStaffList(){
+    var el = document.getElementById("staffList");
+    el.innerHTML = "";
+    state.staff.forEach(function(name){
+      var count = 0;
+      Object.keys(state.data).forEach(function(id){ if(state.data[id].collector === name) count++; });
+      var row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = "<span class='nm'>" + escapeHtml(name) + "</span><span class='mm'>" + count + "</span>";
+      var delBtn = document.createElement("button");
+      delBtn.className = "btn btn-sm btn-outline";
+      delBtn.textContent = t("deleteStaffBtn");
+      delBtn.style.marginLeft = "8px";
+      delBtn.addEventListener("click", function(){
+        state.staff = state.staff.filter(function(s){ return s !== name; });
+        if(!state.staff.length) state.staff = DEFAULT_STAFF.slice();
+        saveStaff(); populateStaffDropdowns(); renderStaffList();
+      });
+      row.appendChild(delBtn);
+      el.appendChild(row);
+    });
+  }
+  document.getElementById("addStaffBtn").addEventListener("click", function(){
+    var name = document.getElementById("newStaffName").value.trim();
+    if(!name){ return; }
+    if(state.staff.indexOf(name) !== -1){ alert(t("staffExists")); return; }
+    state.staff.push(name);
+    saveStaff(); populateStaffDropdowns(); renderStaffList();
+    document.getElementById("newStaffName").value = "";
+    alert(t("staffAdded"));
   });
 
   // ---------- Tabs / Lines ----------
@@ -803,13 +960,20 @@
 
   // ---------- Mode popup (quick mark paid) ----------
   var modePopupTargetId = null;
-  function openModePopup(id){ modePopupTargetId = id; showOverlay("modeOverlay"); }
+  function openModePopup(id){
+    modePopupTargetId = id;
+    var c = state.data[id];
+    var sel = document.getElementById("modeCollectorSelect");
+    sel.value = c && c.collector && state.staff.indexOf(c.collector) !== -1 ? c.collector : (state.staff[0] || "");
+    showOverlay("modeOverlay");
+  }
   ["Cash","Upi","Office"].forEach(function(m){
     document.getElementById("mode"+m+"Btn").addEventListener("click", function(){
       var id = modePopupTargetId;
       if(!id || !state.data[id]) { hideOverlay("modeOverlay"); return; }
       var c = state.data[id];
-      c.status = "paid"; c.lastPaid = todayStr(); c.mode = m.toLowerCase();
+      var collector = document.getElementById("modeCollectorSelect").value;
+      c.status = "paid"; c.lastPaid = todayStr(); c.mode = m.toLowerCase(); c.collector = collector;
       saveData(); hideOverlay("modeOverlay"); renderAll();
     });
   });
@@ -826,6 +990,7 @@
     document.getElementById("fLastPaid").value = c ? c.lastPaid || "" : "";
     document.getElementById("fDueDate").value = c ? c.dueDate || "" : "";
     document.getElementById("fMode").value = c ? c.mode || "cash" : "cash";
+    document.getElementById("fCollector").value = c && c.collector && state.staff.indexOf(c.collector) !== -1 ? c.collector : (state.staff[0] || "");
     document.getElementById("fNotes").value = c ? c.notes || "" : "";
     pendingStatus = c ? c.status || "unpaid" : "unpaid";
     updateStatusPicker();
@@ -856,6 +1021,7 @@
       lastPaid: document.getElementById("fLastPaid").value,
       dueDate: document.getElementById("fDueDate").value,
       mode: document.getElementById("fMode").value,
+      collector: document.getElementById("fCollector").value,
       notes: document.getElementById("fNotes").value.trim()
     };
     saveData(); hideOverlay("customerOverlay"); renderAll();
@@ -942,7 +1108,7 @@
 
   // ---------- Backup / Restore ----------
   document.getElementById("exportBtn").addEventListener("click", function(){
-    var payload = { data: state.data, settings: state.settings, categories: state.categories, exportedAt: new Date().toISOString() };
+    var payload = { data: state.data, settings: state.settings, categories: state.categories, staff: state.staff, exportedAt: new Date().toISOString() };
     var blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
@@ -960,7 +1126,8 @@
         state.data = payload.data || {};
         state.settings = Object.assign(state.settings, payload.settings || {});
         if(payload.categories && payload.categories.length){ state.categories = payload.categories; }
-        saveData(); saveSettings(); saveCategories();
+        if(payload.staff && payload.staff.length){ state.staff = payload.staff; }
+        saveData(); saveSettings(); saveCategories(); saveStaff();
         document.getElementById("shopNameInput").value = state.settings.shopName;
         state.activeCat = state.categories[0].code;
         renderAll();
@@ -971,10 +1138,124 @@
     e.target.value = "";
   });
 
+  // ---------- Cloud Sync (Firebase) ----------
+  function loadSyncConfig(){
+    try{ var raw = localStorage.getItem(SYNC_CONFIG_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  }
+  function saveSyncConfig(conf){ localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(conf)); }
+  function clearSyncConfig(){ localStorage.removeItem(SYNC_CONFIG_KEY); }
+
+  function loadFirebaseSDK(callback, onError){
+    if(window.firebase && window.firebase.database){ callback(); return; }
+    var s1 = document.createElement("script");
+    s1.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js";
+    s1.onload = function(){
+      var s2 = document.createElement("script");
+      s2.src = "https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js";
+      s2.onload = callback;
+      s2.onerror = onError;
+      document.head.appendChild(s2);
+    };
+    s1.onerror = onError;
+    document.head.appendChild(s1);
+  }
+
+  function updateSyncStatus(kind){
+    var dot = document.getElementById("syncStatusDot");
+    var text = document.getElementById("syncStatusText");
+    var colors = { connected:"#1f9d55", connecting:"#d6a419", error:"#d64545", off:"#8b98a5" };
+    dot.style.background = colors[kind] || colors.off;
+    if(text){
+      if(kind === "connected") text.textContent = t("syncConnected");
+      else if(kind === "connecting") text.textContent = t("syncConnecting");
+      else if(kind === "error") text.textContent = t("syncErrorMsg");
+      else text.textContent = t("syncNotConnected");
+    }
+  }
+
+  function attachSyncListener(roomId){
+    if(syncRef){ try{ syncRef.off(); }catch(e){} }
+    syncRef = fbDb.ref("cabletv_shops/" + roomId);
+    syncRef.on("value", function(snapshot){
+      var val = snapshot.val();
+      updateSyncStatus("connected");
+      if(!val) return;
+      isApplyingRemote = true;
+      if(val.data) state.data = val.data;
+      if(val.settings) state.settings = Object.assign(state.settings, val.settings);
+      if(val.categories && val.categories.length) state.categories = val.categories;
+      if(val.staff && val.staff.length) state.staff = val.staff;
+      localStorage.setItem(DATA_KEY, JSON.stringify(state.data));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories));
+      localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff));
+      document.getElementById("shopNameInput").value = state.settings.shopName;
+      if(!state.categories.some(function(c){ return c.code === state.activeCat; })){
+        state.activeCat = state.categories[0].code;
+      }
+      populateStaffDropdowns();
+      renderAll();
+      isApplyingRemote = false;
+    }, function(){ updateSyncStatus("error"); });
+  }
+
+  function pushToCloud(){
+    if(!syncEnabled || !fbDb || isApplyingRemote) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    var payload = { data: state.data, settings: state.settings, categories: state.categories, staff: state.staff, updatedAt: Date.now() };
+    fbDb.ref("cabletv_shops/" + conf.roomId).set(payload);
+  }
+
+  function connectSync(configObj, roomId, silent){
+    updateSyncStatus("connecting");
+    loadFirebaseSDK(function(){
+      try{
+        if(!window.firebase.apps || !window.firebase.apps.length){ fbApp = firebase.initializeApp(configObj); }
+        else{ fbApp = firebase.app(); }
+        fbDb = firebase.database();
+        syncEnabled = true;
+        saveSyncConfig({ config:configObj, roomId:roomId, enabled:true });
+        attachSyncListener(roomId);
+        if(!silent){ pushToCloud(); }
+      }catch(err){
+        updateSyncStatus("error");
+        if(!silent) alert(t("syncErrorMsg"));
+      }
+    }, function(){
+      updateSyncStatus("error");
+      if(!silent) alert(t("syncErrorMsg"));
+    });
+  }
+
+  document.getElementById("syncBtn").addEventListener("click", function(){
+    var conf = loadSyncConfig();
+    document.getElementById("syncConfigInput").value = conf ? JSON.stringify(conf.config, null, 2) : "";
+    document.getElementById("syncRoomInput").value = conf ? conf.roomId : "";
+    updateSyncStatus(syncEnabled ? "connected" : "off");
+    showOverlay("syncOverlay");
+  });
+  document.getElementById("syncConnectBtn").addEventListener("click", function(){
+    var raw = document.getElementById("syncConfigInput").value.trim();
+    var roomId = document.getElementById("syncRoomInput").value.trim();
+    var configObj;
+    try{ configObj = JSON.parse(raw); }catch(e){ alert(t("syncInvalidConfig")); return; }
+    if(!configObj || !configObj.databaseURL){ alert(t("syncInvalidConfig")); return; }
+    if(!roomId){ alert(t("syncNeedRoom")); return; }
+    connectSync(configObj, roomId, false);
+  });
+  document.getElementById("syncDisconnectBtn").addEventListener("click", function(){
+    if(syncRef){ try{ syncRef.off(); }catch(e){} syncRef = null; }
+    syncEnabled = false;
+    clearSyncConfig();
+    updateSyncStatus("off");
+  });
+
   // ---------- Report / Pie chart ----------
   function computeStatusCounts(){
     var paid=0, unpaid=0, suspended=0;
     var cash=0, upi=0, office=0;
+    var byStaff = {};
     Object.keys(state.data).forEach(function(id){
       var c = state.data[id];
       var amt = Number(c.amount)||0;
@@ -983,22 +1264,28 @@
         if(c.mode === "upi") upi += amt;
         else if(c.mode === "office") office += amt;
         else cash += amt;
+        var who = c.collector || "";
+        if(who){ byStaff[who] = (byStaff[who]||0) + amt; }
       }else if(c.status === "unpaid"){ unpaid++; }
       else if(c.status === "suspended"){ suspended++; }
     });
-    return { paid:paid, unpaid:unpaid, suspended:suspended, cash:cash, upi:upi, office:office, total: paid+unpaid+suspended };
+    return { paid:paid, unpaid:unpaid, suspended:suspended, cash:cash, upi:upi, office:office, byStaff:byStaff, total: paid+unpaid+suspended };
   }
 
   document.getElementById("reportBtn").addEventListener("click", function(){
     var counts = computeStatusCounts();
     var totalCollection = counts.cash + counts.upi + counts.office;
     var reportGrid = document.getElementById("reportGrid");
-    reportGrid.innerHTML =
+    var html =
       "<div class='stat-card collected'><div class='num'>"+fmtMoney(totalCollection)+"</div><div class='lbl'>"+t("reportTotalCollection")+"</div></div>" +
       "<div class='stat-card'><div class='num'>"+fmtMoney(counts.cash)+"</div><div class='lbl'>"+t("reportCash")+"</div></div>" +
       "<div class='stat-card'><div class='num'>"+fmtMoney(counts.upi)+"</div><div class='lbl'>"+t("reportUpi")+"</div></div>" +
       "<div class='stat-card'><div class='num'>"+fmtMoney(counts.office)+"</div><div class='lbl'>"+t("reportOffice")+"</div></div>";
-
+    state.staff.forEach(function(name){
+      var amt = counts.byStaff[name] || 0;
+      html += "<div class='stat-card'><div class='num'>"+fmtMoney(amt)+"</div><div class='lbl'>"+t("reportByStaff")+": "+escapeHtml(name)+"</div></div>";
+    });
+    reportGrid.innerHTML = html;
     drawPie(counts);
     showOverlay("reportOverlay");
   });
@@ -1107,6 +1394,11 @@
   loadAll();
   document.getElementById("shopNameInput").value = state.settings.shopName || "My Cable TV Network";
   applyLanguage();
+
+  var savedSync = loadSyncConfig();
+  if(savedSync && savedSync.enabled && savedSync.config && savedSync.roomId){
+    connectSync(savedSync.config, savedSync.roomId, true);
+  }
 
 })();
 </script>

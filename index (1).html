@@ -29,7 +29,7 @@
 
   .top-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .searchbox{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:6px;min-width:220px;}
-  .searchbox input{background:transparent;border:none;color:#fff;outline:none;font-size:13.5px;width:100%;}
+  .searchbox input{background:transparent;border:none;color:#fff;outline:none;font-size:13.5px;flex:1 1 auto;min-width:60px;}
   .searchbox input::placeholder{color:#cdd9e2;}
   .mic-btn{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:6px;width:26px;height:26px;flex:none;cursor:pointer;font-size:13px;}
   .mic-btn.listening{background:var(--unpaid);animation:pulse 1s infinite;}
@@ -234,6 +234,13 @@
       <div class="field">
         <label id="lblAmount">Plan Amount (₹)</label>
         <input id="fAmount" type="number" min="0" placeholder="e.g. 300" />
+      </div>
+    </div>
+    <div class="field">
+      <label id="lblSerial">Set-Top Box Serial No. (optional)</label>
+      <div class="field-with-mic">
+        <input id="fSerial" type="text" placeholder="e.g. STB1234567" />
+        <button class="mic-btn" id="serialMicBtn" title="Speak serial number" type="button">🎤</button>
       </div>
     </div>
     <div class="row2">
@@ -460,7 +467,7 @@
   var I18N = {
     en:{
       tagline:"Customer & Billing Manager",
-      searchPlaceholder:"Search name, mobile or box no...",
+      searchPlaceholder:"Search name, mobile, box no or serial no...",
       reportBtn:"📊 Report", settingsBtn:"⚙ Shop Details", exportBtn:"⬇ Backup", importBtn:"⬆ Restore",
       legPaid:"Paid", legUnpaid:"Unpaid", legSuspended:"Suspended", legEmpty:"Empty slot (tap + to add)",
       seriesWord:"series",
@@ -468,6 +475,7 @@
       statCollected:"Collected", statPending:"Pending",
       addTitle:"Add Customer", editTitle:"Edit Customer", boxLabel:"Box",
       lblName:"Customer Name", lblMobile:"Mobile Number", lblAmount:"Plan Amount (₹)",
+      lblSerial:"Set-Top Box Serial No. (optional)",
       lblLastPaid:"Last Paid Date", lblDueDate:"Next Due Date", lblStatus:"Payment Status",
       lblMode:"Collection Mode", lblNotes:"Notes (optional)", lblCollector:"Collected By", lblModeCollector:"Collected By",
       staffBtn:"👤 Staff", staffTitle:"Manage Staff", staffSub:"Add the names of members who collect payments",
@@ -507,7 +515,7 @@
     },
     ta:{
       tagline:"வாடிக்கையாளர் & பில்லிங் மேலாளர்",
-      searchPlaceholder:"பெயர், மொபைல் அல்லது பாக்ஸ் எண் தேடவும்...",
+      searchPlaceholder:"பெயர், மொபைல், பாக்ஸ் எண் அல்லது சீரியல் எண் தேடவும்...",
       reportBtn:"📊 அறிக்கை", settingsBtn:"⚙ கடை விவரங்கள்", exportBtn:"⬇ காப்புப்பிரதி", importBtn:"⬆ மீட்டமை",
       legPaid:"செலுத்தப்பட்டது", legUnpaid:"செலுத்தப்படவில்லை", legSuspended:"இடைநிறுத்தப்பட்டது", legEmpty:"காலி இடம் (+ தட்டவும்)",
       seriesWord:"வரிசை",
@@ -515,6 +523,7 @@
       statCollected:"வசூலானது", statPending:"நிலுவை",
       addTitle:"வாடிக்கையாளரைச் சேர்", editTitle:"வாடிக்கையாளரைத் திருத்து", boxLabel:"பாக்ஸ்",
       lblName:"வாடிக்கையாளர் பெயர்", lblMobile:"மொபைல் எண்", lblAmount:"திட்ட தொகை (₹)",
+      lblSerial:"செட்-டாப் பாக்ஸ் சீரியல் எண் (விருப்பம்)",
       lblLastPaid:"கடைசியாக செலுத்திய தேதி", lblDueDate:"அடுத்த செலுத்த வேண்டிய தேதி", lblStatus:"கட்டண நிலை",
       lblMode:"வசூல் முறை", lblNotes:"குறிப்புகள் (விருப்பம்)", lblCollector:"யார் வசூலித்தார்", lblModeCollector:"யார் வசூலித்தார்",
       staffBtn:"👤 ஊழியர்", staffTitle:"ஊழியர்களை நிர்வகி", staffSub:"பணம் வசூலிக்கும் நபர்களின் பெயர்களைச் சேர்க்கவும்",
@@ -597,6 +606,18 @@
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, function(ch){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]; });
   }
+  function normalizeSearchText(s){
+    return String(s||"").toLowerCase().replace(/[^a-z0-9\u0B80-\u0BFF]+/g," ").replace(/\s+/g," ").trim();
+  }
+  // Tolerant match: every word in the (normalized) search term must appear somewhere
+  // in the haystack. This lets slightly-off voice transcriptions, extra spaces, or
+  // words in a different order still find the right customer.
+  function textMatches(hay, term){
+    var h = normalizeSearchText(hay);
+    var tokens = normalizeSearchText(term).split(" ").filter(Boolean);
+    if(!tokens.length) return false;
+    return tokens.every(function(tok){ return h.indexOf(tok) !== -1; });
+  }
 
   // ---------- Language ----------
   function applyLanguage(){
@@ -613,6 +634,7 @@
     document.getElementById("lblName").textContent = t("lblName");
     document.getElementById("lblMobile").textContent = t("lblMobile");
     document.getElementById("lblAmount").textContent = t("lblAmount");
+    document.getElementById("lblSerial").textContent = t("lblSerial");
     document.getElementById("lblLastPaid").textContent = t("lblLastPaid");
     document.getElementById("lblDueDate").textContent = t("lblDueDate");
     document.getElementById("lblStatus").textContent = t("lblStatus");
@@ -746,6 +768,10 @@
   document.getElementById("mobileMicBtn").addEventListener("click", function(){
     var btn = this;
     startMic(btn, function(text){ document.getElementById("fMobile").value = text; }, true);
+  });
+  document.getElementById("serialMicBtn").addEventListener("click", function(){
+    var btn = this;
+    startMic(btn, function(text){ document.getElementById("fSerial").value = text; }, false);
   });
   document.getElementById("searchMicBtn").addEventListener("click", function(){
     var btn = this;
@@ -921,8 +947,8 @@
         for(var i=1;i<=cat.max;i++){
           var id = cat.code + i; var c = state.data[id];
           if(!c) continue;
-          var hay = (c.name||"") + " " + (c.mobile||"") + " " + id;
-          if(hay.toLowerCase().indexOf(term) !== -1){ matchCount++; grid.appendChild(buildBox(id, c)); }
+          var hay = (c.name||"") + " " + (c.mobile||"") + " " + id + " " + (c.serial||"") + " " + (c.notes||"");
+          if(textMatches(hay, term)){ matchCount++; grid.appendChild(buildBox(id, c)); }
         }
       });
       noResults.style.display = matchCount === 0 ? "block" : "none";
@@ -987,6 +1013,7 @@
     document.getElementById("fName").value = c ? c.name || "" : "";
     document.getElementById("fMobile").value = c ? c.mobile || "" : "";
     document.getElementById("fAmount").value = c ? c.amount || "" : "";
+    document.getElementById("fSerial").value = c ? c.serial || "" : "";
     document.getElementById("fLastPaid").value = c ? c.lastPaid || "" : "";
     document.getElementById("fDueDate").value = c ? c.dueDate || "" : "";
     document.getElementById("fMode").value = c ? c.mode || "cash" : "cash";
@@ -1018,6 +1045,7 @@
     if(!mobile){ alert("Please enter a mobile number."); return; }
     state.data[id] = {
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
+      serial: document.getElementById("fSerial").value.trim(),
       lastPaid: document.getElementById("fLastPaid").value,
       dueDate: document.getElementById("fDueDate").value,
       mode: document.getElementById("fMode").value,

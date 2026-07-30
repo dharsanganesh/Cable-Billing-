@@ -148,6 +148,16 @@
   .list-item .nm{font-weight:700;}
   .list-item .mm{color:var(--muted);font-size:11.5px;}
 
+  #toastStack{position:fixed;top:70px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;max-width:320px;}
+  .toast{background:var(--navy);color:#fff;padding:12px 14px;border-radius:9px;box-shadow:0 8px 20px rgba(0,0,0,.25);font-size:13px;line-height:1.4;animation:toastIn .25s ease;}
+  .toast b{display:block;font-size:13px;margin-bottom:2px;}
+  @keyframes toastIn{from{transform:translateX(30px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+  .log-row{border-bottom:1px solid #eceff2;padding:8px 4px;font-size:12.5px;}
+  .log-row .lg-top{display:flex;justify-content:space-between;font-weight:700;color:var(--ink);}
+  .log-row .lg-desc{color:var(--slate);margin-top:2px;}
+  .log-row .lg-meta{color:var(--muted);font-size:11px;margin-top:2px;}
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:12px;}
+  .filter-row .field{margin-bottom:0;flex:1;min-width:130px;}
   @media print{
     body *{visibility:hidden;}
     #receiptPrintArea, #receiptPrintArea *{visibility:visible;}
@@ -184,6 +194,7 @@
     </div>
     <button class="btn btn-ghost" id="syncBtn">☁ <span id="syncStatusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b98a5;margin-left:2px;"></span> <span id="syncBtnLabel">Cloud Sync</span></button>
     <button class="btn btn-ghost" id="reportBtn">📊 Report</button>
+    <button class="btn btn-ghost" id="activityBtn">📋 Activity</button>
     <button class="btn btn-ghost" id="staffBtn">👤 Staff</button>
     <button class="btn btn-ghost" id="settingsBtn">⚙ Shop Details</button>
     <button class="btn btn-ghost" id="exportBtn">⬇ Backup</button>
@@ -447,6 +458,9 @@
   <div class="modal">
     <button class="close-x" data-close="listOverlay">✕</button>
     <h2 id="listTitle">Customers</h2>
+    <div class="modal-actions" style="margin-top:0;margin-bottom:12px;">
+      <button class="btn btn-accent" id="listDownloadBtn">⬇ Download List</button>
+    </div>
     <div id="listBody" style="max-height:400px;overflow-y:auto;"></div>
   </div>
 </div>
@@ -479,6 +493,30 @@
   </div>
 </div>
 
+<!-- Activity Log Modal -->
+<div class="overlay" id="activityOverlay">
+  <div class="modal wide">
+    <button class="close-x" data-close="activityOverlay">✕</button>
+    <h2 id="activityTitle">Activity Log</h2>
+    <div class="sub" id="activitySub">What changed — paid/unpaid, active/suspended, new customers, address, etc.</div>
+    <div class="filter-row">
+      <div class="field">
+        <label id="lblLogFrom">From Date</label>
+        <input id="logFromDate" type="date" />
+      </div>
+      <div class="field">
+        <label id="lblLogTo">To Date</label>
+        <input id="logToDate" type="date" />
+      </div>
+      <button class="btn btn-outline" id="logFilterBtn" style="height:38px;">Filter</button>
+      <button class="btn btn-accent" id="logDownloadBtn" style="height:38px;">⬇ Download CSV</button>
+    </div>
+    <div id="activityBody" style="max-height:420px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<div id="toastStack"></div>
+
 <div id="receiptPrintArea"></div>
 
 <script>
@@ -493,6 +531,8 @@
   var SYNC_CONFIG_KEY = "cabletv_billing_sync_config_v1";
   var SESSION_KEY = "cabletv_billing_session_v1";
   var LANG_KEY = "cabletv_billing_lang_v1";
+  var CHANGELOG_KEY = "cabletv_billing_changelog_v1";
+  var MAX_LOG_ENTRIES = 3000;
 
   var DEFAULT_CATEGORIES = [
     { code:"U", max:200 },
@@ -633,9 +673,12 @@
     activeCat: "U",
     activeBox: null,
     searchTerm: "",
-    session: null
+    session: null,
+    changeLog: []
   };
   var fbApp = null, fbDb = null, syncRef = null, syncEnabled = false, isApplyingRemote = false;
+  var notifRef = null;
+  var sessionStartTs = Date.now();
 
   function t(key){ return (I18N[state.lang] && I18N[state.lang][key] !== undefined) ? I18N[state.lang][key] : I18N.en[key]; }
 
@@ -677,6 +720,7 @@
     if(!state.categories.length) state.categories = DEFAULT_CATEGORIES.slice();
     state.activeCat = state.categories[0].code;
     try{ var rawSess = localStorage.getItem(SESSION_KEY); state.session = rawSess ? JSON.parse(rawSess) : null; }catch(e){ state.session = null; }
+    try{ var rawLog = localStorage.getItem(CHANGELOG_KEY); state.changeLog = rawLog ? JSON.parse(rawLog) : []; }catch(e){ state.changeLog = []; }
   }
   function saveSession(){
     if(state.session) localStorage.setItem(SESSION_KEY, JSON.stringify(state.session));
@@ -687,6 +731,30 @@
   function saveCategories(){ localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories)); pushToCloud(); }
   function saveStaff(){ localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff)); pushToCloud(); }
   function saveLang(){ localStorage.setItem(LANG_KEY, state.lang); }
+  function saveChangeLog(){
+    if(state.changeLog.length > MAX_LOG_ENTRIES){
+      state.changeLog = state.changeLog.slice(state.changeLog.length - MAX_LOG_ENTRIES);
+    }
+    localStorage.setItem(CHANGELOG_KEY, JSON.stringify(state.changeLog));
+    pushToCloud();
+  }
+  function whoAmI(){
+    if(!state.session) return "Office";
+    if(state.session.role === "office") return "Office";
+    return state.session.staffName;
+  }
+  function logChange(boxId, customerName, action, detail){
+    state.changeLog.push({
+      ts: Date.now(),
+      dateStr: todayStr(),
+      box: boxId,
+      customer: customerName || "",
+      action: action,
+      detail: detail || "",
+      by: whoAmI()
+    });
+    saveChangeLog();
+  }
   function nextInvoiceNumber(){
     var n = parseInt(localStorage.getItem(INVOICE_KEY) || "1000", 10);
     n += 1; localStorage.setItem(INVOICE_KEY, String(n)); return n;
@@ -699,6 +767,28 @@
   function waNumber(m){ var d = cleanMobile(m); if(d.length===10) d = "91"+d; return d; }
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, function(ch){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch]; });
+  }
+  function showToast(title, body){
+    var stack = document.getElementById("toastStack");
+    if(!stack) return;
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.innerHTML = "<b>"+escapeHtml(title)+"</b>"+escapeHtml(body);
+    stack.appendChild(el);
+    setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 7000);
+  }
+  // Sends a popup notification to the other role (office<->staff) via cloud sync.
+  // Only works once Cloud Sync is connected, since that's the shared channel between devices.
+  function notifyOtherRole(boxId, custName, status, mode, collector){
+    if(!syncEnabled || !fbDb) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    var byRole = state.session ? state.session.role : "office";
+    var byName = whoAmI();
+    fbDb.ref("cabletv_shops/" + conf.roomId + "/notifications").push({
+      ts: Date.now(), byRole: byRole, byName: byName,
+      box: boxId, customer: custName || "", status: status, mode: mode || "", collector: collector || ""
+    });
   }
 
   // ---------- Language ----------
@@ -1134,27 +1224,38 @@
     for(var i=1;i<=cat.max;i++){ var id = cat.code + i; grid.appendChild(buildBox(id, state.data[id])); }
   }
 
+  function isStaffSession(){ return state.session && state.session.role === "staff"; }
   function buildBox(id, c){
     var box = document.createElement("div");
     if(!c){
       box.className = "box empty";
       box.innerHTML = "<div class='plus'>+</div><div class='boxno'>"+id+"</div>";
-      box.addEventListener("click", function(){ openCustomerModal(id, null); });
+      if(isStaffSession()){
+        // Staff can view their customers, bill them and see reports, but cannot add
+        // new customers or otherwise edit the customer list — that stays with Office.
+        box.style.cursor = "default";
+        box.style.opacity = ".6";
+      }else{
+        box.addEventListener("click", function(){ openCustomerModal(id, null); });
+      }
       return box;
     }
     box.className = "box status-" + c.status;
     var amt = fmtMoney(c.amount);
+    var quickBtns = "<button data-act='bill' style='font-weight:900;text-decoration:underline;'>"+t("quickBill")+"</button>" +
+        "<button data-act='paid'>"+t("quickMarkPaid")+"</button>";
+    if(!isStaffSession()){ quickBtns += "<button data-act='edit'>"+t("quickEdit")+"</button>"; }
     box.innerHTML =
       "<div><div class='boxno'>"+id+"</div><div class='cname'>"+escapeHtml(c.name||"(no name)")+"</div><div class='cmobile'>"+escapeHtml(c.mobile||"—")+"</div></div>" +
-      "<div><div class='camount'>"+amt+" /mo</div><div class='cquick'>" +
-        "<button data-act='bill' style='font-weight:900;text-decoration:underline;'>"+t("quickBill")+"</button>" +
-        "<button data-act='paid'>"+t("quickMarkPaid")+"</button>" +
-        "<button data-act='edit'>"+t("quickEdit")+"</button>" +
-      "</div></div>";
-    box.querySelector("[data-act='edit']").addEventListener("click", function(ev){ ev.stopPropagation(); openCustomerModal(id, c); });
+      "<div><div class='camount'>"+amt+" /mo</div><div class='cquick'>" + quickBtns + "</div></div>";
+    var editBtn = box.querySelector("[data-act='edit']");
+    if(editBtn){ editBtn.addEventListener("click", function(ev){ ev.stopPropagation(); openCustomerModal(id, c); }); }
     box.querySelector("[data-act='bill']").addEventListener("click", function(ev){ ev.stopPropagation(); openReceipt(id, c); });
     box.querySelector("[data-act='paid']").addEventListener("click", function(ev){ ev.stopPropagation(); openModePopup(id); });
-    box.addEventListener("click", function(){ openCustomerModal(id, c); });
+    box.addEventListener("click", function(){
+      if(isStaffSession()){ openCustomerModal(id, c); } // opens in view-only mode for staff
+      else{ openCustomerModal(id, c); }
+    });
     return box;
   }
 
@@ -1181,7 +1282,12 @@
       if(!id || !state.data[id]) { hideOverlay("modeOverlay"); return; }
       var c = state.data[id];
       var collector = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("modeCollectorSelect").value;
+      var wasStatus = c.status;
       c.status = "paid"; c.lastPaid = todayStr(); c.mode = m.toLowerCase(); c.collector = collector;
+      if(wasStatus !== "paid"){
+        logChange(id, c.name, "Status changed", wasStatus.toUpperCase()+" → PAID ("+m.toUpperCase()+", collected by "+collector+")");
+      }
+      notifyOtherRole(id, c.name, "paid", m.toLowerCase(), collector);
       saveData(); hideOverlay("modeOverlay"); renderAll();
     });
   });
@@ -1210,8 +1316,18 @@
     document.getElementById("fNotes").value = c ? c.notes || "" : "";
     pendingStatus = c ? c.status || "unpaid" : "unpaid";
     updateStatusPicker();
-    document.getElementById("deleteCustBtn").style.display = c ? "inline-block" : "none";
+    var staffView = isStaffSession();
+    document.getElementById("deleteCustBtn").style.display = (c && !staffView) ? "inline-block" : "none";
     document.getElementById("billFromModalBtn").style.display = c ? "inline-block" : "none";
+    document.getElementById("saveCustBtn").style.display = staffView ? "none" : "inline-block";
+    ["fName","fMobile","fAmount","fLastPaid","fDueDate","fMode","fCollector","fNotes"].forEach(function(fid){
+      document.getElementById(fid).disabled = staffView;
+    });
+    document.querySelectorAll("#statusPicker .status-opt").forEach(function(el){
+      el.style.pointerEvents = staffView ? "none" : "";
+      el.style.opacity = staffView ? ".7" : "";
+    });
+    document.getElementById("custModalSub").textContent = t("boxLabel") + " " + id + (staffView ? "  ·  view only" : "");
     showOverlay("customerOverlay");
   }
   function updateStatusPicker(){
@@ -1232,19 +1348,35 @@
     var amount = document.getElementById("fAmount").value;
     if(!name){ alert("Please enter the customer name."); return; }
     var collectorVal = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("fCollector").value;
+    var oldC = state.data[id] ? Object.assign({}, state.data[id]) : null;
+    var notesVal = document.getElementById("fNotes").value.trim();
     state.data[id] = {
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
       lastPaid: document.getElementById("fLastPaid").value,
       dueDate: document.getElementById("fDueDate").value,
       mode: document.getElementById("fMode").value,
       collector: collectorVal,
-      notes: document.getElementById("fNotes").value.trim()
+      notes: notesVal
     };
+    if(!oldC){
+      logChange(id, name, "New customer added", "Added to box " + id + (mobile ? (", mobile " + mobile) : ""));
+    }else{
+      if(oldC.name !== name){ logChange(id, name, "Name changed", "'"+oldC.name+"' → '"+name+"'"); }
+      if((oldC.mobile||"") !== mobile){ logChange(id, name, "Number changed", "'"+(oldC.mobile||"—")+"' → '"+(mobile||"—")+"'"); }
+      if((oldC.notes||"") !== notesVal){ logChange(id, name, "Address / notes changed", "'"+(oldC.notes||"—")+"' → '"+(notesVal||"—")+"'"); }
+      if(String(oldC.amount||"") !== String(amount||"")){ logChange(id, name, "Plan amount changed", fmtMoney(oldC.amount)+" → "+fmtMoney(amount)); }
+      if(oldC.status !== pendingStatus){
+        logChange(id, name, "Status changed", oldC.status.toUpperCase()+" → "+pendingStatus.toUpperCase());
+        notifyOtherRole(id, name, pendingStatus, document.getElementById("fMode").value, collectorVal);
+      }
+    }
     saveData(); hideOverlay("customerOverlay"); renderAll();
   });
   document.getElementById("deleteCustBtn").addEventListener("click", function(){
     var id = state.activeBox;
     if(!confirm("Remove customer from box " + id + "? This cannot be undone.")) return;
+    var removedName = state.data[id] ? state.data[id].name : "";
+    logChange(id, removedName, "Customer removed", "Removed from box " + id);
     delete state.data[id]; saveData(); hideOverlay("customerOverlay"); renderAll();
   });
   document.getElementById("billFromModalBtn").addEventListener("click", function(){
@@ -1405,10 +1537,12 @@
       if(val.settings) state.settings = Object.assign(state.settings, val.settings);
       if(val.categories && val.categories.length) state.categories = val.categories;
       if(val.staff && val.staff.length) state.staff = val.staff;
+      if(val.changeLog && val.changeLog.length) state.changeLog = val.changeLog;
       localStorage.setItem(DATA_KEY, JSON.stringify(state.data));
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
       localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories));
       localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff));
+      localStorage.setItem(CHANGELOG_KEY, JSON.stringify(state.changeLog));
       document.getElementById("shopNameInput").value = state.settings.shopName;
       if(!state.categories.some(function(c){ return c.code === state.activeCat; })){
         state.activeCat = state.categories[0].code;
@@ -1417,14 +1551,29 @@
       renderAll();
       isApplyingRemote = false;
     }, function(){ updateSyncStatus("error"); });
+
+    if(notifRef){ try{ notifRef.off(); }catch(e){} }
+    notifRef = fbDb.ref("cabletv_shops/" + roomId + "/notifications");
+    notifRef.limitToLast(20).on("child_added", function(snapshot){
+      var n = snapshot.val();
+      if(!n || n.ts < sessionStartTs) return;
+      var myRole = state.session ? state.session.role : "office";
+      var myName = whoAmI();
+      if(n.byRole === myRole && n.byName === myName) return; // ignore my own action
+      // Office should hear staff collections; staff should hear office collections.
+      var relevant = (myRole === "office" && n.byRole === "staff") || (myRole === "staff" && n.byRole === "office");
+      if(!relevant) return;
+      var who = n.byRole === "office" ? "Office" : n.byName;
+      showToast("💰 Payment collected", who + " collected " + fmtMoney(state.data[n.box] ? state.data[n.box].amount : "") + " from " + (n.customer||("box "+n.box)) + " via " + (n.mode||"").toUpperCase() + ".");
+    });
   }
 
   function pushToCloud(){
     if(!syncEnabled || !fbDb || isApplyingRemote) return;
     var conf = loadSyncConfig();
     if(!conf) return;
-    var payload = { data: state.data, settings: state.settings, categories: state.categories, staff: state.staff, updatedAt: Date.now() };
-    fbDb.ref("cabletv_shops/" + conf.roomId).set(payload);
+    var payload = { data: state.data, settings: state.settings, categories: state.categories, staff: state.staff, changeLog: state.changeLog, updatedAt: Date.now() };
+    fbDb.ref("cabletv_shops/" + conf.roomId).update(payload);
   }
 
   function connectSync(configObj, roomId, silent){
@@ -1488,7 +1637,9 @@
   function computeStatusCounts(){
     var paid=0, unpaid=0, suspended=0;
     var cash=0, upi=0, office=0;
+    var staffCash=0, staffUpi=0, officeTotal=0;
     var byStaff = {};
+    var staffNames = state.staff.map(function(s){ return s.name; });
     Object.keys(state.data).forEach(function(id){
       if(!isBoxVisible(id)) return;
       var c = state.data[id];
@@ -1500,10 +1651,18 @@
         else cash += amt;
         var who = c.collector || "";
         if(who){ byStaff[who] = (byStaff[who]||0) + amt; }
+        var collectedByStaff = who && staffNames.indexOf(who) !== -1 && c.mode !== "office";
+        if(collectedByStaff){
+          if(c.mode === "upi") staffUpi += amt; else staffCash += amt;
+        }else{
+          officeTotal += amt;
+        }
       }else if(c.status === "unpaid"){ unpaid++; }
       else if(c.status === "suspended"){ suspended++; }
     });
-    return { paid:paid, unpaid:unpaid, suspended:suspended, cash:cash, upi:upi, office:office, byStaff:byStaff, total: paid+unpaid+suspended };
+    return { paid:paid, unpaid:unpaid, suspended:suspended, cash:cash, upi:upi, office:office,
+      staffCash:staffCash, staffUpi:staffUpi, officeTotal:officeTotal,
+      byStaff:byStaff, total: paid+unpaid+suspended };
   }
 
   document.getElementById("reportBtn").addEventListener("click", function(){
@@ -1512,9 +1671,9 @@
     var reportGrid = document.getElementById("reportGrid");
     var html =
       "<div class='stat-card collected'><div class='num'>"+fmtMoney(totalCollection)+"</div><div class='lbl'>"+t("reportTotalCollection")+"</div></div>" +
-      "<div class='stat-card'><div class='num'>"+fmtMoney(counts.cash)+"</div><div class='lbl'>"+t("reportCash")+"</div></div>" +
-      "<div class='stat-card'><div class='num'>"+fmtMoney(counts.upi)+"</div><div class='lbl'>"+t("reportUpi")+"</div></div>" +
-      "<div class='stat-card'><div class='num'>"+fmtMoney(counts.office)+"</div><div class='lbl'>"+t("reportOffice")+"</div></div>";
+      "<div class='stat-card'><div class='num'>"+fmtMoney(counts.officeTotal)+"</div><div class='lbl'>Office Collection</div></div>" +
+      "<div class='stat-card'><div class='num'>"+fmtMoney(counts.staffCash)+"</div><div class='lbl'>Staff Collection — Cash</div></div>" +
+      "<div class='stat-card'><div class='num'>"+fmtMoney(counts.staffUpi)+"</div><div class='lbl'>Staff Collection — UPI</div></div>";
     if(isOffice()){
       state.staff.forEach(function(s){
         var amt = counts.byStaff[s.name] || 0;
@@ -1590,7 +1749,24 @@
     return ["M", cx, cy, "L", start.x, start.y, "A", r, r, 0, largeArc, 0, end.x, end.y, "Z"].join(" ");
   }
 
+  function csvEscape(v){
+    v = String(v === undefined || v === null ? "" : v);
+    if(/[",\n]/.test(v)){ v = '"' + v.replace(/"/g,'""') + '"'; }
+    return v;
+  }
+  function downloadCSV(filename, headerRow, rows){
+    var lines = [headerRow.map(csvEscape).join(",")];
+    rows.forEach(function(r){ lines.push(r.map(csvEscape).join(",")); });
+    var blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type:"text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  var currentListStatusKey = null, currentListLabel = "";
   function showListFor(statusKey, label){
+    currentListStatusKey = statusKey; currentListLabel = label;
     var body = document.getElementById("listBody");
     body.innerHTML = "";
     var found = 0;
@@ -1614,6 +1790,61 @@
     document.getElementById("listTitle").textContent = t("listTitleFor")(label);
     showOverlay("listOverlay");
   }
+  document.getElementById("listDownloadBtn").addEventListener("click", function(){
+    if(!currentListStatusKey) return;
+    var rows = [];
+    Object.keys(state.data).forEach(function(id){
+      if(!isBoxVisible(id)) return;
+      var c = state.data[id];
+      if(c.status !== currentListStatusKey) return;
+      rows.push([id, c.name||"", c.mobile||"", c.amount||"", c.dueDate||"", c.notes||""]);
+    });
+    downloadCSV("cable-billing-" + currentListStatusKey + "-" + todayStr() + ".csv",
+      ["Box No","Customer Name","Mobile","Plan Amount","Next Due Date","Notes / Address"], rows);
+  });
+
+  // ---------- Activity Log ----------
+  function filteredChangeLog(){
+    var from = document.getElementById("logFromDate").value;
+    var to = document.getElementById("logToDate").value;
+    return state.changeLog.filter(function(e){
+      if(from && e.dateStr < from) return false;
+      if(to && e.dateStr > to) return false;
+      return true;
+    }).sort(function(a,b){ return b.ts - a.ts; });
+  }
+  function renderActivityLog(){
+    var body = document.getElementById("activityBody");
+    var entries = filteredChangeLog();
+    if(!entries.length){
+      body.innerHTML = "<div class='empty-state'>No activity recorded for this range.</div>";
+      return;
+    }
+    body.innerHTML = entries.map(function(e){
+      var when = new Date(e.ts).toLocaleString("en-IN", { day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit" });
+      return "<div class='log-row'>" +
+        "<div class='lg-top'><span>"+escapeHtml(e.action)+" — Box "+escapeHtml(e.box)+(e.customer?(" ("+escapeHtml(e.customer)+")"):"")+"</span><span>"+when+"</span></div>" +
+        (e.detail ? "<div class='lg-desc'>"+escapeHtml(e.detail)+"</div>" : "") +
+        "<div class='lg-meta'>By "+escapeHtml(e.by)+"</div>" +
+      "</div>";
+    }).join("");
+  }
+  document.getElementById("activityBtn").addEventListener("click", function(){
+    document.getElementById("logFromDate").value = "";
+    document.getElementById("logToDate").value = "";
+    renderActivityLog();
+    showOverlay("activityOverlay");
+  });
+  document.getElementById("logFilterBtn").addEventListener("click", renderActivityLog);
+  document.getElementById("logDownloadBtn").addEventListener("click", function(){
+    var entries = filteredChangeLog();
+    var rows = entries.map(function(e){
+      var when = new Date(e.ts).toLocaleString("en-IN");
+      return [when, e.box, e.customer, e.action, e.detail, e.by];
+    });
+    downloadCSV("cable-billing-activity-" + todayStr() + ".csv",
+      ["Date/Time","Box No","Customer","Change","Detail","Changed By"], rows);
+  });
 
   // ---------- Overlays ----------
   function showOverlay(id){ document.getElementById(id).classList.add("show"); }

@@ -1401,7 +1401,7 @@
       c.periodFrom = periodFrom;
       c.periodTo = periodTo;
       c.lastBillingNote = document.getElementById("modeNotes").value.trim();
-      c.paidRecordedOn = todayStr();
+      c.paidRecordedOn = datePaid;
       logActivity("paid", id, c.name, m.toLowerCase() + " · " + collector + " · " + months + "mo · " + fmtMoney(collectedAmt));
       saveData(); hideOverlay("modeOverlay"); renderAll();
     });
@@ -1456,22 +1456,26 @@
     var isNew = !state.data[id];
     var prev = state.data[id] || {};
     var collectorVal = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("fCollector").value;
+    // If marking Paid and the Last Paid Date box was left empty, default it to
+    // today rather than leaving it blank — this is the date the Report will
+    // file the collection under.
+    var lastPaidVal = document.getElementById("fLastPaid").value;
+    if(pendingStatus === "paid" && !lastPaidVal){ lastPaidVal = todayStr(); }
     state.data[id] = Object.assign({}, prev, {
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
-      lastPaid: document.getElementById("fLastPaid").value,
+      lastPaid: lastPaidVal,
       dueDate: document.getElementById("fDueDate").value,
       stb: document.getElementById("fStb").value.trim(),
       mode: document.getElementById("fMode").value,
       collector: collectorVal,
       notes: document.getElementById("fNotes").value.trim()
     });
-    // If this edit marks the customer Paid, record it as a collection for
-    // today's actual save date (paidRecordedOn) and snapshot the paid
-    // amount, so the Report's date filter matches reality even when the
-    // "Last Paid Date" field above wasn't updated to today.
+    // Snapshot the paid amount and the date this collection counts under in
+    // the Report — this follows Last Paid Date (which staff can backdate),
+    // not necessarily today's real calendar date.
     if(pendingStatus === "paid"){
       state.data[id].lastPaidAmount = Number(amount) || 0;
-      state.data[id].paidRecordedOn = todayStr();
+      state.data[id].paidRecordedOn = lastPaidVal;
     }
     var statusLabelKeys = { paid:"optPaid", unpaid:"optUnpaid", suspended:"optSuspended" };
     logActivity(isNew ? "added" : "updated", id, name, fmtMoney(amount) + " · " + t(statusLabelKeys[pendingStatus] || "optUnpaid"));

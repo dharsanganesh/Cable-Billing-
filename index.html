@@ -256,6 +256,13 @@
         <input id="fDueDate" type="date" />
       </div>
     </div>
+    <div class="row2">
+      <div class="field">
+        <label id="lblStb">STB / Box No <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+        <input id="fStb" type="text" placeholder="e.g. STB00123" />
+      </div>
+      <div></div>
+    </div>
     <div class="field">
       <label id="lblStatus">Payment Status</label>
       <div class="status-picker" id="statusPicker">
@@ -615,6 +622,7 @@
       lblName:"Customer Name", lblMobile:"Mobile Number (optional)", lblAmount:"Plan Amount (₹)",
       lblLastPaid:"Last Paid Date", lblDueDate:"Next Due Date", lblStatus:"Payment Status",
       lblMode:"Collection Mode", lblNotes:"Notes (optional)", lblCollector:"Collected By", lblModeCollector:"Collected By", lblModeMonths:"Paid For",
+      lblStb:"STB / Box No (optional)",
       lblModeName:"Name", lblModeMobile:"Mobile", lblModePlanAmount:"Plan Amount (₹)", lblModeAmountReceived:"Amount Received (₹)",
       lblModePeriod:"For a Period of", lblModeFrom:"From", lblModeTo:"To", lblModeDatePaid:"Date Paid", lblModeCurrentDate:"Current Date",
       lblModeNotes:"Notes (optional)", lblModeMode:"Mode",
@@ -681,6 +689,7 @@
       lblName:"வாடிக்கையாளர் பெயர்", lblMobile:"மொபைல் எண் (விருப்பம்)", lblAmount:"திட்ட தொகை (₹)",
       lblLastPaid:"கடைசியாக செலுத்திய தேதி", lblDueDate:"அடுத்த செலுத்த வேண்டிய தேதி", lblStatus:"கட்டண நிலை",
       lblMode:"வசூல் முறை", lblNotes:"குறிப்புகள் (விருப்பம்)", lblCollector:"யார் வசூலித்தார்", lblModeCollector:"யார் வசூலித்தார்", lblModeMonths:"எத்தனை மாதங்களுக்கு செலுத்துகிறார்",
+      lblStb:"STB / பாக்ஸ் எண் (விருப்பம்)",
       lblModeName:"பெயர்", lblModeMobile:"மொபைல்", lblModePlanAmount:"திட்ட தொகை (₹)", lblModeAmountReceived:"பெறப்பட்ட தொகை (₹)",
       lblModePeriod:"எந்த காலத்திற்கு", lblModeFrom:"தொடக்கம்", lblModeTo:"முடிவு", lblModeDatePaid:"செலுத்திய தேதி", lblModeCurrentDate:"இன்றைய தேதி",
       lblModeNotes:"குறிப்புகள் (விருப்பம்)", lblModeMode:"முறை",
@@ -847,6 +856,7 @@
     document.getElementById("lblCollector").textContent = t("lblCollector");
     document.getElementById("lblModeCollector").textContent = t("lblModeCollector");
     document.getElementById("lblModeMonths").textContent = t("lblModeMonths");
+    document.getElementById("lblStb").textContent = t("lblStb");
     document.getElementById("lblModeName").textContent = t("lblModeName");
     document.getElementById("lblModeMobile").textContent = t("lblModeMobile");
     document.getElementById("lblModePlanAmount").textContent = t("lblModePlanAmount");
@@ -1267,7 +1277,7 @@
         for(var i=1;i<=cat.max;i++){
           var id = cat.code + i; var c = state.data[id];
           if(!c) continue;
-          var hay = (c.name||"") + " " + (c.mobile||"") + " " + id;
+          var hay = (c.name||"") + " " + (c.mobile||"") + " " + id + " " + (c.stb||"");
           if(hay.toLowerCase().indexOf(term) !== -1){ matchCount++; grid.appendChild(buildBox(id, c)); }
         }
       });
@@ -1407,6 +1417,7 @@
     document.getElementById("fAmount").value = c ? c.amount || "" : "";
     document.getElementById("fLastPaid").value = c ? c.lastPaid || "" : "";
     document.getElementById("fDueDate").value = c ? c.dueDate || "" : "";
+    document.getElementById("fStb").value = c ? c.stb || "" : "";
     document.getElementById("fMode").value = c ? c.mode || "cash" : "cash";
     var collectorField = document.getElementById("fCollectorField");
     if(state.session && state.session.role === "staff"){
@@ -1447,6 +1458,7 @@
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
       lastPaid: document.getElementById("fLastPaid").value,
       dueDate: document.getElementById("fDueDate").value,
+      stb: document.getElementById("fStb").value.trim(),
       mode: document.getElementById("fMode").value,
       collector: collectorVal,
       notes: document.getElementById("fNotes").value.trim()
@@ -1482,7 +1494,7 @@
       "<hr>" +
       "<div class='receipt-row'><span class='k'>No</span><span class='v'>"+invoiceNo+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Date</span><span class='v'>"+date+"</span></div>" +
-      "<div class='receipt-row'><span class='k'>Box No</span><span class='v'>"+id+"</span></div>" +
+      "<div class='receipt-row'><span class='k'>Box No</span><span class='v'>"+id+(c.stb ? " ("+escapeHtml(c.stb)+")" : "")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Name</span><span class='v'>"+escapeHtml(c.name||"")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Mobile</span><span class='v'>"+escapeHtml(c.mobile||"")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Status</span><span class='v'><span class='badge "+c.status+"'>"+c.status.toUpperCase()+"</span></span></div>" +

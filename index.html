@@ -161,6 +161,7 @@
     #receiptPrintArea .badge{font-size:9px;padding:1px 6px;}
     .overlay{position:static;background:none;padding:0;}
   }
+  
   @media (max-width:560px){
     .row2{grid-template-columns:1fr;}
     .searchbox{min-width:0;flex:1 1 100%;order:-1;width:100%;}
@@ -306,6 +307,7 @@
     <div class="receipt-box" id="receiptPreview"></div>
     <div class="modal-actions">
       <button class="btn btn-outline" id="printBtn">🖨 Print</button>
+      <button class="btn btn-outline" id="shareToPrintBtn">📤 Share to Print App</button>
       <button class="btn btn-paid" id="sendBtn">📩 Send on WhatsApp</button>
     </div>
   </div>
@@ -652,6 +654,9 @@
       removeBtn:"🗑 Remove", billBtn:"🧾 Generate Bill", saveCustomerBtn:"Save Customer",
       receiptTitle:"Billing Receipt", receiptSub:"Preview before printing or sending",
       printBtn:"🖨 Print", sendBtn:"📩 Send on WhatsApp",
+      shareToPrintBtn:"📤 Share to Print App",
+      shareNotSupported:"Sharing isn't supported in this browser. Please use the Print button instead, or open this app in Chrome.",
+      shareFailed:"Could not prepare the receipt for sharing. Please try the Print button instead.",
       settingsTitle:"Shop Details", settingsSub:"Shown on printed / sent receipts",
       lblShopName:"Shop Name", lblAddress:"Address", lblPhone:"Contact Number", lblUpi:"UPI ID (optional)",
       saveDetailsBtn:"Save Details",
@@ -719,6 +724,9 @@
       removeBtn:"🗑 நீக்கு", billBtn:"🧾 பில் உருவாக்கு", saveCustomerBtn:"வாடிக்கையாளரை சேமி",
       receiptTitle:"பில் ரசீது", receiptSub:"அச்சிடும் முன் அல்லது அனுப்பும் முன் பார்வையிடவும்",
       printBtn:"🖨 அச்சிடு", sendBtn:"📩 WhatsApp வழியாக அனுப்பு",
+      shareToPrintBtn:"📤 பிரிண்ட் ஆப்பிற்கு பகிர்",
+      shareNotSupported:"இந்த உலாவியில் பகிர்வு ஆதரிக்கப்படவில்லை. Print பொத்தானை பயன்படுத்தவும் அல்லது Chrome-ல் திறக்கவும்.",
+      shareFailed:"ரசீதை பகிர தயார் செய்ய முடியவில்லை. Print பொத்தானை முயற்சிக்கவும்.",
       settingsTitle:"கடை விவரங்கள்", settingsSub:"ரசீதுகளில் காட்டப்படும்",
       lblShopName:"கடை பெயர்", lblAddress:"முகவரி", lblPhone:"தொடர்பு எண்", lblUpi:"UPI ஐடி (விருப்பம்)",
       saveDetailsBtn:"விவரங்களை சேமி",
@@ -914,6 +922,7 @@
     document.getElementById("receiptSub").textContent = t("receiptSub");
     document.getElementById("printBtn").textContent = t("printBtn");
     document.getElementById("sendBtn").textContent = t("sendBtn");
+    document.getElementById("shareToPrintBtn").textContent = t("shareToPrintBtn");
     document.getElementById("settingsTitle").textContent = t("settingsTitle");
     document.getElementById("settingsSub").textContent = t("settingsSub");
     document.getElementById("lblShopName").textContent = t("lblShopName");
@@ -1531,6 +1540,49 @@
     showOverlay("receiptOverlay");
   }
   document.getElementById("printBtn").addEventListener("click", function(){ window.print(); });
+
+  // ---------- Share to Print App (Web Share, bypasses the browser Print dialog) ----------
+  var html2canvasLoading = null;
+  function loadHtml2Canvas(){
+    if(window.html2canvas) return Promise.resolve();
+    if(html2canvasLoading) return html2canvasLoading;
+    html2canvasLoading = new Promise(function(resolve, reject){
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+    return html2canvasLoading;
+  }
+  document.getElementById("shareToPrintBtn").addEventListener("click", function(){
+    var btn = this;
+    if(!navigator.share || !navigator.canShare){
+      alert(t("shareNotSupported"));
+      return;
+    }
+    var original = btn.textContent;
+    btn.textContent = "…";
+    btn.disabled = true;
+    loadHtml2Canvas().then(function(){
+      var target = document.getElementById("receiptPreview");
+      var scale = 2.5;
+      return window.html2canvas(target, { backgroundColor:"#ffffff", scale:scale });
+    }).then(function(canvas){
+      return new Promise(function(resolve){ canvas.toBlob(resolve, "image/png"); });
+    }).then(function(blob){
+      if(!blob) throw new Error("no-blob");
+      var file = new File([blob], "receipt.png", { type:"image/png" });
+      if(!navigator.canShare({ files:[file] })){ throw new Error("cannot-share-files"); }
+      return navigator.share({ files:[file], title: t("receiptTitle") });
+    }).catch(function(err){
+      if(err && err.name === "AbortError"){ return; } // user cancelled the share sheet, not an error
+      alert(t("shareFailed"));
+    }).finally(function(){
+      btn.textContent = original;
+      btn.disabled = false;
+    });
+  });
   document.getElementById("sendBtn").addEventListener("click", function(){
     var btn = this;
     var num = waNumber(btn.getAttribute("data-mobile"));

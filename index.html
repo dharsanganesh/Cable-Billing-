@@ -507,15 +507,22 @@
     <h2 id="reportTitleH">Collection Report</h2>
     <div class="sub" id="reportSub">Based on current status of all customers</div>
 
-    <div class="row2" style="align-items:end;margin-bottom:14px;">
+    <div class="row2" style="margin-bottom:10px;">
       <div class="field" style="margin-bottom:0;">
-        <label id="lblReportDate">Filter by Date</label>
-        <input id="reportDateFilter" type="date" />
+        <label id="lblReportFrom">From</label>
+        <input id="reportDateFrom" type="date" />
       </div>
-      <div class="field" style="display:flex;gap:8px;margin-bottom:0;">
-        <button class="btn btn-outline btn-sm" id="reportClearBtn" style="flex:1;">Show All</button>
-        <button class="btn btn-accent btn-sm" id="reportTodayBtn" style="flex:1;">Today</button>
+      <div class="field" style="margin-bottom:0;">
+        <label id="lblReportTo">To</label>
+        <input id="reportDateTo" type="date" />
       </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-outline btn-sm" id="reportClearBtn">Show All</button>
+      <button class="btn btn-outline btn-sm" id="reportTodayBtn">Today</button>
+      <button class="btn btn-outline btn-sm" id="reportLast7Btn">Last 7 Days</button>
+      <button class="btn btn-outline btn-sm" id="reportLast15Btn">Last 15 Days</button>
+      <button class="btn btn-outline btn-sm" id="reportThisMonthBtn">This Month</button>
     </div>
 
     <div class="report-grid" id="reportGrid"></div>
@@ -533,15 +540,23 @@
     <button class="close-x" data-close="activityOverlay">✕</button>
     <h2 id="activityTitle">Activity Log</h2>
     <div class="sub" id="activitySub">Recent changes made in this app</div>
-    <div class="row2" style="align-items:end;">
-      <div class="field">
-        <label id="lblActivityDate">Filter by Date</label>
-        <input id="activityDateFilter" type="date" />
+    <div class="row2" style="margin-bottom:10px;">
+      <div class="field" style="margin-bottom:0;">
+        <label id="lblActivityFrom">From</label>
+        <input id="activityDateFrom" type="date" />
       </div>
-      <div class="field" style="display:flex;gap:8px;">
-        <button class="btn btn-outline btn-sm" id="activityClearBtn" style="flex:1;">Show All</button>
-        <button class="btn btn-accent btn-sm" id="activityDownloadBtn" style="flex:1;">⬇ Download</button>
+      <div class="field" style="margin-bottom:0;">
+        <label id="lblActivityTo">To</label>
+        <input id="activityDateTo" type="date" />
       </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+      <button class="btn btn-outline btn-sm" id="activityClearBtn">Show All</button>
+      <button class="btn btn-outline btn-sm" id="activityTodayBtn">Today</button>
+      <button class="btn btn-outline btn-sm" id="activityLast7Btn">Last 7 Days</button>
+      <button class="btn btn-outline btn-sm" id="activityLast15Btn">Last 15 Days</button>
+      <button class="btn btn-outline btn-sm" id="activityThisMonthBtn">This Month</button>
+      <button class="btn btn-accent btn-sm" id="activityDownloadBtn" style="margin-left:auto;">⬇ Download</button>
     </div>
     <div id="activityBody" style="max-height:440px;overflow-y:auto;"></div>
   </div>
@@ -668,7 +683,8 @@
       lblLinePrefix:"New Line Letter (e.g. B)", lblLineMax:"Max Customers in this Line", addLineBtn:"➕ Add Line",
       reportTitleH:"Collection Report", reportSub:"Based on current status of all customers",
       reportTotalCollection:"Total Collection", reportCash:"Cash Collection", reportUpi:"UPI Collection", reportOffice:"Office Collection",
-      lblReportDate:"Filter by Date", reportClearBtn:"Show All", reportTodayBtn:"Today",
+      lblReportFrom:"From", lblReportTo:"To", reportClearBtn:"Show All", reportTodayBtn:"Today",
+      reportLast7Btn:"Last 7 Days", reportLast15Btn:"Last 15 Days", reportThisMonthBtn:"This Month",
       pieNoData:"No customers added yet.",
       listTitleFor:function(s){ return s + " Customers"; },
       confirmRemoveLine:"This line has customers in it and cannot be removed.",
@@ -678,7 +694,8 @@
       activityBtnLabel:"Activity", activityTitle:"Activity Log", activitySub:"Recent changes made in this app",
       actionAdded:"Added customer", actionUpdated:"Updated customer", actionRemoved:"Removed customer", actionPaid:"Marked Paid", actionAutoUnpaid:"Auto-marked Unpaid (due date passed)",
       noActivity:"No activity recorded yet.",
-      lblActivityDate:"Filter by Date", activityClearBtn:"Show All", activityDownloadBtn:"⬇ Download",
+      lblActivityFrom:"From", lblActivityTo:"To", activityClearBtn:"Show All", activityDownloadBtn:"⬇ Download",
+      activityTodayBtn:"Today", activityLast7Btn:"Last 7 Days", activityLast15Btn:"Last 15 Days", activityThisMonthBtn:"This Month",
       lineAdded:"Line added successfully.",
       deleteLineBtn:"Remove"
     },
@@ -738,7 +755,8 @@
       lblLinePrefix:"புதிய வரிசை எழுத்து (உதா. B)", lblLineMax:"இந்த வரிசையின் அதிகபட்ச எண்", addLineBtn:"➕ வரிசை சேர்",
       reportTitleH:"வசூல் அறிக்கை", reportSub:"தற்போதைய நிலையின் அடிப்படையில்",
       reportTotalCollection:"மொத்த வசூல்", reportCash:"பணமாக வசூல்", reportUpi:"UPI வசூல்", reportOffice:"அலுவலக வசூல்",
-      lblReportDate:"தேதி வாரியாக வடிகட்டு", reportClearBtn:"அனைத்தும் காட்டு", reportTodayBtn:"இன்று",
+      lblReportFrom:"தொடக்கம்", lblReportTo:"முடிவு", reportClearBtn:"அனைத்தும் காட்டு", reportTodayBtn:"இன்று",
+      reportLast7Btn:"கடந்த 7 நாட்கள்", reportLast15Btn:"கடந்த 15 நாட்கள்", reportThisMonthBtn:"இந்த மாதம்",
       pieNoData:"இன்னும் வாடிக்கையாளர்கள் சேர்க்கப்படவில்லை.",
       listTitleFor:function(s){ return s + " வாடிக்கையாளர்கள்"; },
       confirmRemoveLine:"இந்த வரிசையில் வாடிக்கையாளர்கள் உள்ளனர், நீக்க முடியாது.",
@@ -748,7 +766,8 @@
       activityBtnLabel:"செயல்பாடு", activityTitle:"செயல்பாட்டு பதிவு", activitySub:"இந்த பயன்பாட்டில் சமீபத்திய மாற்றங்கள்",
       actionAdded:"வாடிக்கையாளர் சேர்க்கப்பட்டார்", actionUpdated:"வாடிக்கையாளர் புதுப்பிக்கப்பட்டார்", actionRemoved:"வாடிக்கையாளர் நீக்கப்பட்டார்", actionPaid:"செலுத்தியதாக குறிக்கப்பட்டது", actionAutoUnpaid:"தானாக செலுத்தாதது எனக் குறிக்கப்பட்டது",
       noActivity:"இன்னும் செயல்பாடுகள் பதிவு செய்யப்படவில்லை.",
-      lblActivityDate:"தேதி வாரியாக வடிகட்டு", activityClearBtn:"அனைத்தும் காட்டு", activityDownloadBtn:"⬇ பதிவிறக்கு",
+      lblActivityFrom:"தொடக்கம்", lblActivityTo:"முடிவு", activityClearBtn:"அனைத்தும் காட்டு", activityDownloadBtn:"⬇ பதிவிறக்கு",
+      activityTodayBtn:"இன்று", activityLast7Btn:"கடந்த 7 நாட்கள்", activityLast15Btn:"கடந்த 15 நாட்கள்", activityThisMonthBtn:"இந்த மாதம்",
       lineAdded:"வரிசை வெற்றிகரமாக சேர்க்கப்பட்டது.",
       deleteLineBtn:"நீக்கு"
     }
@@ -897,8 +916,13 @@
     document.getElementById("activityBtnLabel").textContent = t("activityBtnLabel");
     document.getElementById("activityTitle").textContent = t("activityTitle");
     document.getElementById("activitySub").textContent = t("activitySub");
-    document.getElementById("lblActivityDate").textContent = t("lblActivityDate");
+    document.getElementById("lblActivityFrom").textContent = t("lblActivityFrom");
+    document.getElementById("lblActivityTo").textContent = t("lblActivityTo");
     document.getElementById("activityClearBtn").textContent = t("activityClearBtn");
+    document.getElementById("activityTodayBtn").textContent = t("activityTodayBtn");
+    document.getElementById("activityLast7Btn").textContent = t("activityLast7Btn");
+    document.getElementById("activityLast15Btn").textContent = t("activityLast15Btn");
+    document.getElementById("activityThisMonthBtn").textContent = t("activityThisMonthBtn");
     document.getElementById("activityDownloadBtn").textContent = t("activityDownloadBtn");
     document.getElementById("syncBtnLabel").textContent = t("syncBtnLabel");
     document.getElementById("syncTitle").textContent = t("syncTitle");
@@ -942,9 +966,13 @@
     document.getElementById("addLineBtn").textContent = t("addLineBtn");
     document.getElementById("reportTitleH").textContent = t("reportTitleH");
     document.getElementById("reportSub").textContent = t("reportSub");
-    document.getElementById("lblReportDate").textContent = t("lblReportDate");
+    document.getElementById("lblReportFrom").textContent = t("lblReportFrom");
+    document.getElementById("lblReportTo").textContent = t("lblReportTo");
     document.getElementById("reportClearBtn").textContent = t("reportClearBtn");
     document.getElementById("reportTodayBtn").textContent = t("reportTodayBtn");
+    document.getElementById("reportLast7Btn").textContent = t("reportLast7Btn");
+    document.getElementById("reportLast15Btn").textContent = t("reportLast15Btn");
+    document.getElementById("reportThisMonthBtn").textContent = t("reportThisMonthBtn");
     document.getElementById("langEnBtn").classList.toggle("on", state.lang==="en");
     document.getElementById("langTaBtn").classList.toggle("on", state.lang==="ta");
     populateStaffDropdowns();
@@ -1786,11 +1814,12 @@
   });
 
   // ---------- Report / Pie chart ----------
-  // dateFilter: optional "YYYY-MM-DD" string. When set, collection totals
-  // (cash/upi/office/byStaff) only include customers whose last-paid date
-  // matches that day. Paid/unpaid/suspended status counts always reflect
-  // current live status (status itself has no date range).
-  function computeStatusCounts(dateFilter){
+  // fromDate/toDate: optional "YYYY-MM-DD" strings (inclusive range). When
+  // set, collection totals (cash/upi/office/byStaff) only include customers
+  // whose recorded paid date falls within [fromDate, toDate]. Paid/unpaid/
+  // suspended status counts always reflect current live status (status
+  // itself has no date range).
+  function computeStatusCounts(fromDate, toDate){
     var paid=0, unpaid=0, suspended=0;
     var cash=0, upi=0, office=0;
     var byStaff = {};
@@ -1801,7 +1830,9 @@
       if(c.status === "paid"){
         paid++;
         var recordedOn = c.paidRecordedOn || c.lastPaid;
-        if(!dateFilter || recordedOn === dateFilter){
+        var inRange = (!fromDate && !toDate) ||
+          ((!fromDate || recordedOn >= fromDate) && (!toDate || recordedOn <= toDate));
+        if(inRange){
           if(c.mode === "upi") upi += amt;
           else cash += amt;
           var who = c.collector || "";
@@ -1815,8 +1846,9 @@
   }
 
   function renderReport(){
-    var dateFilter = document.getElementById("reportDateFilter").value;
-    var counts = computeStatusCounts(dateFilter || null);
+    var fromDate = document.getElementById("reportDateFrom").value;
+    var toDate = document.getElementById("reportDateTo").value;
+    var counts = computeStatusCounts(fromDate || null, toDate || null);
     var totalCollection = counts.cash + counts.upi;
     var reportGrid = document.getElementById("reportGrid");
     var html =
@@ -1833,27 +1865,43 @@
     }
     reportGrid.innerHTML = html;
     var subEl = document.getElementById("reportSub");
-    if(dateFilter){
-      subEl.textContent = t("reportSub") + " — " + dateFilter;
+    if(fromDate || toDate){
+      var rangeText = (fromDate || "…") + " to " + (toDate || "…");
+      subEl.textContent = t("reportSub") + " — " + rangeText;
     }else{
       subEl.textContent = t("reportSub");
     }
     drawPie(counts);
   }
+  function setReportRange(from, to){
+    document.getElementById("reportDateFrom").value = from || "";
+    document.getElementById("reportDateTo").value = to || "";
+    renderReport();
+  }
 
   document.getElementById("reportBtn").addEventListener("click", function(){
-    document.getElementById("reportDateFilter").value = "";
+    document.getElementById("reportDateFrom").value = "";
+    document.getElementById("reportDateTo").value = "";
     renderReport();
     showOverlay("reportOverlay");
   });
-  document.getElementById("reportDateFilter").addEventListener("change", renderReport);
-  document.getElementById("reportClearBtn").addEventListener("click", function(){
-    document.getElementById("reportDateFilter").value = "";
-    renderReport();
-  });
+  document.getElementById("reportDateFrom").addEventListener("change", renderReport);
+  document.getElementById("reportDateTo").addEventListener("change", renderReport);
+  document.getElementById("reportClearBtn").addEventListener("click", function(){ setReportRange("", ""); });
   document.getElementById("reportTodayBtn").addEventListener("click", function(){
-    document.getElementById("reportDateFilter").value = todayStr();
-    renderReport();
+    var today = todayStr();
+    setReportRange(today, today);
+  });
+  document.getElementById("reportLast7Btn").addEventListener("click", function(){
+    setReportRange(addDaysToDate(todayStr(), -6), todayStr());
+  });
+  document.getElementById("reportLast15Btn").addEventListener("click", function(){
+    setReportRange(addDaysToDate(todayStr(), -14), todayStr());
+  });
+  document.getElementById("reportThisMonthBtn").addEventListener("click", function(){
+    var today = todayStr();
+    var firstOfMonth = today.slice(0,8) + "01";
+    setReportRange(firstOfMonth, today);
   });
 
   function drawPie(counts){
@@ -1934,10 +1982,13 @@
   var ACTION_LABEL_KEYS = { added:"actionAdded", updated:"actionUpdated", removed:"actionRemoved", paid:"actionPaid", "auto-unpaid":"actionAutoUnpaid" };
 
   function getFilteredActivity(){
-    var dateFilter = document.getElementById("activityDateFilter").value;
+    var fromDate = document.getElementById("activityDateFrom").value;
+    var toDate = document.getElementById("activityDateTo").value;
     return state.activityLog.filter(function(e){
       if(!isBoxVisible(e.box)) return false;
-      if(dateFilter && dateKeyOf(e.time) !== dateFilter) return false;
+      var key = dateKeyOf(e.time);
+      if(fromDate && key < fromDate) return false;
+      if(toDate && key > toDate) return false;
       return true;
     });
   }
@@ -1963,16 +2014,35 @@
       body.appendChild(row);
     });
   }
+  function setActivityRange(from, to){
+    document.getElementById("activityDateFrom").value = from || "";
+    document.getElementById("activityDateTo").value = to || "";
+    renderActivityList();
+  }
 
   document.getElementById("activityBtn").addEventListener("click", function(){
-    document.getElementById("activityDateFilter").value = "";
+    document.getElementById("activityDateFrom").value = "";
+    document.getElementById("activityDateTo").value = "";
     renderActivityList();
     showOverlay("activityOverlay");
   });
-  document.getElementById("activityDateFilter").addEventListener("change", renderActivityList);
-  document.getElementById("activityClearBtn").addEventListener("click", function(){
-    document.getElementById("activityDateFilter").value = "";
-    renderActivityList();
+  document.getElementById("activityDateFrom").addEventListener("change", renderActivityList);
+  document.getElementById("activityDateTo").addEventListener("change", renderActivityList);
+  document.getElementById("activityClearBtn").addEventListener("click", function(){ setActivityRange("", ""); });
+  document.getElementById("activityTodayBtn").addEventListener("click", function(){
+    var today = todayStr();
+    setActivityRange(today, today);
+  });
+  document.getElementById("activityLast7Btn").addEventListener("click", function(){
+    setActivityRange(addDaysToDate(todayStr(), -6), todayStr());
+  });
+  document.getElementById("activityLast15Btn").addEventListener("click", function(){
+    setActivityRange(addDaysToDate(todayStr(), -14), todayStr());
+  });
+  document.getElementById("activityThisMonthBtn").addEventListener("click", function(){
+    var today = todayStr();
+    var firstOfMonth = today.slice(0,8) + "01";
+    setActivityRange(firstOfMonth, today);
   });
   document.getElementById("activityDownloadBtn").addEventListener("click", function(){
     var entries = getFilteredActivity();
@@ -1993,8 +2063,10 @@
     var blob = new Blob(["\uFEFF" + csv], { type:"text/csv;charset=utf-8;" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
-    var dateFilter = document.getElementById("activityDateFilter").value;
-    var fname = "activity-log" + (dateFilter ? "-" + dateFilter : "-" + todayStr()) + ".csv";
+    var fromDate = document.getElementById("activityDateFrom").value;
+    var toDate = document.getElementById("activityDateTo").value;
+    var rangePart = fromDate || toDate ? "-" + (fromDate || "start") + "_to_" + (toDate || "now") : "-" + todayStr();
+    var fname = "activity-log" + rangePart + ".csv";
     a.href = url; a.download = fname;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);

@@ -179,6 +179,7 @@
     <div class="brand-text">
       <input id="shopNameInput" value="My Cable TV Network" />
       <small id="tagline">Customer &amp; Billing Manager</small>
+      <small id="sessionLabel" style="display:block;font-weight:700;color:#1a7f37;"></small>
     </div>
   </div>
   <div class="top-actions">
@@ -691,7 +692,7 @@
       modeCash:"Cash", modeUpi:"UPI", modeMonthsTotalLabel:"Total to collect:",
       removeBtn:"🗑 Remove", billBtn:"🧾 Generate Bill", saveCustomerBtn:"Save Customer",
       receiptTitle:"Billing Receipt", receiptSub:"Preview before printing or sending",
-      printBtn:"🖨 Print", sendBtn:"📩 Send on WhatsApp", sendSmsBtn:"📱 Send SMS",
+      printBtn:"🖨 Print", sendBtn:"📩 Send on WhatsApp", sendSmsBtn:"📱 Send SMS", sessionOfficeId:"Office ID",
       shareToPrintBtn:"📤 Share to Print App",
       shareNotSupported:"Sharing isn't supported in this browser. Please use the Print button instead, or open this app in Chrome.",
       shareFailed:"Could not prepare the receipt for sharing. Please try the Print button instead.",
@@ -763,7 +764,7 @@
       modeCash:"பணமாக", modeUpi:"UPI", modeMonthsTotalLabel:"மொத்தம் வசூலிக்க வேண்டியது:",
       removeBtn:"🗑 நீக்கு", billBtn:"🧾 பில் உருவாக்கு", saveCustomerBtn:"வாடிக்கையாளரை சேமி",
       receiptTitle:"பில் ரசீது", receiptSub:"அச்சிடும் முன் அல்லது அனுப்பும் முன் பார்வையிடவும்",
-      printBtn:"🖨 அச்சிடு", sendBtn:"📩 WhatsApp வழியாக அனுப்பு", sendSmsBtn:"📱 SMS அனுப்பு",
+      printBtn:"🖨 அச்சிடு", sendBtn:"📩 WhatsApp வழியாக அனுப்பு", sendSmsBtn:"📱 SMS அனுப்பு", sessionOfficeId:"ஆஃபீஸ் ஐடி",
       shareToPrintBtn:"📤 பிரிண்ட் ஆப்பிற்கு பகிர்",
       shareNotSupported:"இந்த உலாவியில் பகிர்வு ஆதரிக்கப்படவில்லை. Print பொத்தானை பயன்படுத்தவும் அல்லது Chrome-ல் திறக்கவும்.",
       shareFailed:"ரசீதை பகிர தயார் செய்ய முடியவில்லை. Print பொத்தானை முயற்சிக்கவும்.",
@@ -1002,6 +1003,7 @@
     document.getElementById("langEnBtn").classList.toggle("on", state.lang==="en");
     document.getElementById("langTaBtn").classList.toggle("on", state.lang==="ta");
     populateStaffDropdowns();
+    applyRoleUI();
     renderAll();
   }
 
@@ -1863,6 +1865,7 @@
     var paid=0, unpaid=0, suspended=0;
     var cash=0, upi=0, office=0;
     var byStaff = {};
+    var staffOnly = state.session && state.session.role === "staff";
     Object.keys(state.data).forEach(function(id){
       if(!isBoxVisible(id)) return;
       var c = state.data[id];
@@ -1872,10 +1875,11 @@
         var recordedOn = c.paidRecordedOn || c.lastPaid;
         var inRange = (!fromDate && !toDate) ||
           ((!fromDate || recordedOn >= fromDate) && (!toDate || recordedOn <= toDate));
+        var who = c.collector || "";
+        if(staffOnly && who === "Office") inRange = false; // office's own collections stay out of a staff member's report
         if(inRange){
           if(c.mode === "upi") upi += amt;
           else cash += amt;
-          var who = c.collector || "";
           if(who){ byStaff[who] = (byStaff[who]||0) + amt; }
           if(who === "Office") office += amt;
         }
@@ -1921,9 +1925,11 @@
   }
   var lastReportDetailRows = [];
   function renderReportDetail(fromDate, toDate){
+    var staffOnly = state.session && state.session.role === "staff";
     var rows = state.activityLog.filter(function(e){
       if(e.action !== "paid") return false;
       if(!isBoxVisible(e.box)) return false;
+      if(staffOnly && e.actor === "Office") return false;
       var day = reportDayStr(e.time);
       if(fromDate && day < fromDate) return false;
       if(toDate && day > toDate) return false;
@@ -2226,6 +2232,14 @@
       document.getElementById(id).style.display = isOffice() ? "" : "none";
     });
     document.getElementById("logoutBtn").style.display = state.session ? "" : "none";
+    var lbl = document.getElementById("sessionLabel");
+    if(isOffice()){
+      lbl.textContent = t("sessionOfficeId");
+    }else if(state.session && state.session.role === "staff"){
+      lbl.textContent = state.session.staffName;
+    }else{
+      lbl.textContent = "";
+    }
   }
 
   function populateLoginStaffSelect(){

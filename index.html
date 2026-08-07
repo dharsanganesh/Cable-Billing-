@@ -157,6 +157,7 @@
     #receiptPrintArea .r-shop{font-size:13px;}
     #receiptPrintArea .r-addr{font-size:9px;}
     #receiptPrintArea .receipt-row{font-size:10px;padding:1.5px 0;}
+    #receiptPrintArea .receipt-row.r-period{font-size:13px;font-weight:700;}
     #receiptPrintArea .receipt-total{font-size:12px;}
     #receiptPrintArea .badge{font-size:9px;padding:1px 6px;}
     .overlay{position:static;background:none;padding:0;}
@@ -309,6 +310,7 @@
       <button class="btn btn-outline" id="printBtn">🖨 Print</button>
       <button class="btn btn-outline" id="shareToPrintBtn">📤 Share to Print App</button>
       <button class="btn btn-paid" id="sendBtn">📩 Send on WhatsApp</button>
+      <button class="btn btn-outline" id="sendSmsBtn">📱 Send SMS</button>
     </div>
   </div>
 </div>
@@ -668,7 +670,7 @@
       modeCash:"Cash", modeUpi:"UPI", modeMonthsTotalLabel:"Total to collect:",
       removeBtn:"🗑 Remove", billBtn:"🧾 Generate Bill", saveCustomerBtn:"Save Customer",
       receiptTitle:"Billing Receipt", receiptSub:"Preview before printing or sending",
-      printBtn:"🖨 Print", sendBtn:"📩 Send on WhatsApp",
+      printBtn:"🖨 Print", sendBtn:"📩 Send on WhatsApp", sendSmsBtn:"📱 Send SMS",
       shareToPrintBtn:"📤 Share to Print App",
       shareNotSupported:"Sharing isn't supported in this browser. Please use the Print button instead, or open this app in Chrome.",
       shareFailed:"Could not prepare the receipt for sharing. Please try the Print button instead.",
@@ -740,7 +742,7 @@
       modeCash:"பணமாக", modeUpi:"UPI", modeMonthsTotalLabel:"மொத்தம் வசூலிக்க வேண்டியது:",
       removeBtn:"🗑 நீக்கு", billBtn:"🧾 பில் உருவாக்கு", saveCustomerBtn:"வாடிக்கையாளரை சேமி",
       receiptTitle:"பில் ரசீது", receiptSub:"அச்சிடும் முன் அல்லது அனுப்பும் முன் பார்வையிடவும்",
-      printBtn:"🖨 அச்சிடு", sendBtn:"📩 WhatsApp வழியாக அனுப்பு",
+      printBtn:"🖨 அச்சிடு", sendBtn:"📩 WhatsApp வழியாக அனுப்பு", sendSmsBtn:"📱 SMS அனுப்பு",
       shareToPrintBtn:"📤 பிரிண்ட் ஆப்பிற்கு பகிர்",
       shareNotSupported:"இந்த உலாவியில் பகிர்வு ஆதரிக்கப்படவில்லை. Print பொத்தானை பயன்படுத்தவும் அல்லது Chrome-ல் திறக்கவும்.",
       shareFailed:"ரசீதை பகிர தயார் செய்ய முடியவில்லை. Print பொத்தானை முயற்சிக்கவும்.",
@@ -854,6 +856,7 @@
 
   // ---------- Helpers ----------
   function fmtMoney(n){ n = Number(n)||0; return "₹" + n.toLocaleString("en-IN"); }
+  function fmtPeriodDate(s){ s = s || ""; return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(2) : s; }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
   function cleanMobile(m){ return (m||"").replace(/\D/g,""); }
   function waNumber(m){ var d = cleanMobile(m); if(d.length===10) d = "91"+d; return d; }
@@ -946,6 +949,7 @@
     document.getElementById("receiptSub").textContent = t("receiptSub");
     document.getElementById("printBtn").textContent = t("printBtn");
     document.getElementById("sendBtn").textContent = t("sendBtn");
+    document.getElementById("sendSmsBtn").textContent = t("sendSmsBtn");
     document.getElementById("shareToPrintBtn").textContent = t("shareToPrintBtn");
     document.getElementById("settingsTitle").textContent = t("settingsTitle");
     document.getElementById("settingsSub").textContent = t("settingsSub");
@@ -1383,7 +1387,7 @@
       months > 1 ? (t("modeMonthsTotalLabel") + " " + fmtMoney(plan * months)) : "";
     if(!modeToTouched){
       var from = document.getElementById("modePeriodFrom").value;
-      document.getElementById("modePeriodTo").value = addDaysToDate(addMonthsToDate(from, months), -1);
+      document.getElementById("modePeriodTo").value = addMonthsToDate(from, months);
     }
   }
   function openModePopup(id){
@@ -1425,12 +1429,12 @@
       var collector = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("modeCollectorSelect").value;
       var months = Number(document.getElementById("modeMonthsSelect").value) || 1;
       var collectedAmt = Number(document.getElementById("modeAmountReceived").value) || 0;
-      var periodFrom = document.getElementById("modePeriodFrom").value;
-      var periodTo = document.getElementById("modePeriodTo").value;
+      var periodFrom = document.getElementById("modePeriodFrom").value || c.dueDate || c.lastPaid || todayStr();
+      var periodTo = document.getElementById("modePeriodTo").value || addMonthsToDate(periodFrom, months);
       var datePaid = document.getElementById("modeDatePaid").value || todayStr();
       c.status = "paid";
       c.lastPaid = datePaid;
-      c.dueDate = addDaysToDate(periodTo, 1) || addMonthsToDate(periodFrom, months);
+      c.dueDate = periodTo || addMonthsToDate(periodFrom, months);
       c.mode = m.toLowerCase();
       c.collector = collector;
       c.lastPaidAmount = collectedAmt;
@@ -1547,13 +1551,12 @@
       "<div class='receipt-row'><span class='k'>Date</span><span class='v'>"+date+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Box No</span><span class='v'>"+id+(c.stb ? " ("+escapeHtml(c.stb)+")" : "")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Name</span><span class='v'>"+escapeHtml(c.name||"")+"</span></div>" +
-      "<div class='receipt-row'><span class='k'>Mobile</span><span class='v'>"+escapeHtml(c.mobile||"")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Status</span><span class='v'><span class='badge "+c.status+"'>"+c.status.toUpperCase()+"</span></span></div>" +
       (c.status === "paid" && c.mode ? "<div class='receipt-row'><span class='k'>Paid Via</span><span class='v'>"+escapeHtml((c.mode||"").toUpperCase())+"</span></div>" : "") +
       (c.status === "paid" && c.collector ? "<div class='receipt-row'><span class='k'>Collected By</span><span class='v'>"+escapeHtml(c.collector)+"</span></div>" : "") +
       (c.status === "paid" && c.monthsPaid && c.monthsPaid > 1 ? "<div class='receipt-row'><span class='k'>Months Paid</span><span class='v'>"+c.monthsPaid+"</span></div>" : "") +
-      (c.status === "paid" && c.periodFrom && c.periodTo ? "<div class='receipt-row'><span class='k'>For the Period</span><span class='v'>"+escapeHtml(c.periodFrom)+" to "+escapeHtml(c.periodTo)+"</span></div>" : "") +
-      (c.status === "paid" && c.dueDate ? "<div class='receipt-row'><span class='k'>Next Due Date</span><span class='v'>"+escapeHtml(c.dueDate)+"</span></div>" : "") +
+      (c.periodFrom && c.periodTo ? "<div class='receipt-row r-period'><span class='k'>For the Period</span><span class='v'>"+escapeHtml(fmtPeriodDate(c.periodFrom))+" to "+escapeHtml(fmtPeriodDate(c.periodTo))+"</span></div>" : "") +
+      (c.dueDate ? "<div class='receipt-row'><span class='k'>Next Due Date</span><span class='v'>"+escapeHtml(c.dueDate)+"</span></div>" : "") +
       (c.status === "paid" && c.lastBillingNote ? "<div class='receipt-row'><span class='k'>Notes</span><span class='v'>"+escapeHtml(c.lastBillingNote)+"</span></div>" : "") +
       (s.upi ? "<div class='receipt-row'><span class='k'>UPI ID</span><span class='v'>"+escapeHtml(s.upi)+"</span></div>" : "") +
       "<div class='receipt-total'><span>Amount Paid</span><span>"+fmtMoney(c.status === "paid" && c.lastPaidAmount != null ? c.lastPaidAmount : c.amount)+"</span></div>";
@@ -1565,6 +1568,12 @@
     sendBtn.setAttribute("data-amount", (c.status === "paid" && c.lastPaidAmount != null ? c.lastPaidAmount : c.amount) || "");
     sendBtn.setAttribute("data-invoice", invoiceNo);
     sendBtn.setAttribute("data-box", id);
+    var sendSmsBtn = document.getElementById("sendSmsBtn");
+    sendSmsBtn.setAttribute("data-mobile", c.mobile || "");
+    sendSmsBtn.setAttribute("data-name", c.name || "");
+    sendSmsBtn.setAttribute("data-amount", (c.status === "paid" && c.lastPaidAmount != null ? c.lastPaidAmount : c.amount) || "");
+    sendSmsBtn.setAttribute("data-invoice", invoiceNo);
+    sendSmsBtn.setAttribute("data-box", id);
     showOverlay("receiptOverlay");
   }
   document.getElementById("printBtn").addEventListener("click", function(){ window.print(); });
@@ -1621,6 +1630,14 @@
       "Invoice: " + btn.getAttribute("data-invoice") + "\n" +
       "- " + (s.shopName || "Cable TV Network") + (s.phone ? (" | " + s.phone) : "");
     window.open("https://wa.me/" + num + "?text=" + encodeURIComponent(msg), "_blank");
+  });
+  document.getElementById("sendSmsBtn").addEventListener("click", function(){
+    var btn = this;
+    var mobile = (btn.getAttribute("data-mobile") || "").trim();
+    if(!mobile){ alert("No mobile number saved for this customer."); return; }
+    var s = state.settings;
+    var msg = "Hello " + btn.getAttribute("data-name") + ", your cable TV bill (Box " + btn.getAttribute("data-box") + ") is " + fmtMoney(btn.getAttribute("data-amount")) + ". Invoice: " + btn.getAttribute("data-invoice") + ". - " + (s.shopName || "Cable TV Network");
+    window.location.href = "sms:" + mobile + "?body=" + encodeURIComponent(msg);
   });
 
   // ---------- Settings ----------

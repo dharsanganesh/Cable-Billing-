@@ -157,6 +157,7 @@
     #receiptPrintArea .r-shop{font-size:13px;}
     #receiptPrintArea .r-addr{font-size:9px;}
     #receiptPrintArea .receipt-row{font-size:10px;padding:1.5px 0;}
+    #receiptPrintArea .receipt-row.r-period{font-size:13px;font-weight:700;}
     #receiptPrintArea .receipt-total{font-size:12px;}
     #receiptPrintArea .badge{font-size:9px;padding:1px 6px;}
     .overlay{position:static;background:none;padding:0;}
@@ -854,6 +855,7 @@
 
   // ---------- Helpers ----------
   function fmtMoney(n){ n = Number(n)||0; return "₹" + n.toLocaleString("en-IN"); }
+  function fmtPeriodDate(s){ return (s||"").replace(/^\d{2}(\d{2})-/, "$1-"); }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
   function cleanMobile(m){ return (m||"").replace(/\D/g,""); }
   function waNumber(m){ var d = cleanMobile(m); if(d.length===10) d = "91"+d; return d; }
@@ -1552,7 +1554,7 @@
       (c.status === "paid" && c.mode ? "<div class='receipt-row'><span class='k'>Paid Via</span><span class='v'>"+escapeHtml((c.mode||"").toUpperCase())+"</span></div>" : "") +
       (c.status === "paid" && c.collector ? "<div class='receipt-row'><span class='k'>Collected By</span><span class='v'>"+escapeHtml(c.collector)+"</span></div>" : "") +
       (c.status === "paid" && c.monthsPaid && c.monthsPaid > 1 ? "<div class='receipt-row'><span class='k'>Months Paid</span><span class='v'>"+c.monthsPaid+"</span></div>" : "") +
-      (c.status === "paid" && c.periodFrom && c.periodTo ? "<div class='receipt-row'><span class='k'>For the Period</span><span class='v'>"+escapeHtml(c.periodFrom)+" to "+escapeHtml(c.periodTo)+"</span></div>" : "") +
+      (c.status === "paid" && c.periodFrom && c.periodTo ? "<div class='receipt-row r-period'><span class='k'>For the Period</span><span class='v'>"+escapeHtml(fmtPeriodDate(c.periodFrom))+" to "+escapeHtml(fmtPeriodDate(c.periodTo))+"</span></div>" : "") +
       (c.status === "paid" && c.dueDate ? "<div class='receipt-row'><span class='k'>Next Due Date</span><span class='v'>"+escapeHtml(c.dueDate)+"</span></div>" : "") +
       (c.status === "paid" && c.lastBillingNote ? "<div class='receipt-row'><span class='k'>Notes</span><span class='v'>"+escapeHtml(c.lastBillingNote)+"</span></div>" : "") +
       (s.upi ? "<div class='receipt-row'><span class='k'>UPI ID</span><span class='v'>"+escapeHtml(s.upi)+"</span></div>" : "") +

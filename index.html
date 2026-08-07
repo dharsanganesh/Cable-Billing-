@@ -1427,8 +1427,8 @@
       var collector = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("modeCollectorSelect").value;
       var months = Number(document.getElementById("modeMonthsSelect").value) || 1;
       var collectedAmt = Number(document.getElementById("modeAmountReceived").value) || 0;
-      var periodFrom = document.getElementById("modePeriodFrom").value;
-      var periodTo = document.getElementById("modePeriodTo").value;
+      var periodFrom = document.getElementById("modePeriodFrom").value || c.dueDate || c.lastPaid || todayStr();
+      var periodTo = document.getElementById("modePeriodTo").value || addDaysToDate(addMonthsToDate(periodFrom, months), -1);
       var datePaid = document.getElementById("modeDatePaid").value || todayStr();
       c.status = "paid";
       c.lastPaid = datePaid;
@@ -1549,7 +1549,6 @@
       "<div class='receipt-row'><span class='k'>Date</span><span class='v'>"+date+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Box No</span><span class='v'>"+id+(c.stb ? " ("+escapeHtml(c.stb)+")" : "")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Name</span><span class='v'>"+escapeHtml(c.name||"")+"</span></div>" +
-      "<div class='receipt-row'><span class='k'>Mobile</span><span class='v'>"+escapeHtml(c.mobile||"")+"</span></div>" +
       "<div class='receipt-row'><span class='k'>Status</span><span class='v'><span class='badge "+c.status+"'>"+c.status.toUpperCase()+"</span></span></div>" +
       (c.status === "paid" && c.mode ? "<div class='receipt-row'><span class='k'>Paid Via</span><span class='v'>"+escapeHtml((c.mode||"").toUpperCase())+"</span></div>" : "") +
       (c.status === "paid" && c.collector ? "<div class='receipt-row'><span class='k'>Collected By</span><span class='v'>"+escapeHtml(c.collector)+"</span></div>" : "") +

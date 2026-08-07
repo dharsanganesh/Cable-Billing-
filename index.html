@@ -855,7 +855,7 @@
 
   // ---------- Helpers ----------
   function fmtMoney(n){ n = Number(n)||0; return "₹" + n.toLocaleString("en-IN"); }
-  function fmtPeriodDate(s){ return (s||"").replace(/^\d{2}(\d{2})-/, "$1-"); }
+  function fmtPeriodDate(s){ s = s || ""; return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(2) : s; }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
   function cleanMobile(m){ return (m||"").replace(/\D/g,""); }
   function waNumber(m){ var d = cleanMobile(m); if(d.length===10) d = "91"+d; return d; }

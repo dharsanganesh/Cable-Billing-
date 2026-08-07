@@ -533,6 +533,27 @@
       <svg id="pieSvg" width="180" height="180" viewBox="0 0 180 180"></svg>
       <div class="pie-legend" id="pieLegend"></div>
     </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;margin-bottom:8px;">
+      <h3 id="reportDetailTitle" style="margin:0;">Collection Details</h3>
+      <button class="btn btn-outline btn-sm" id="reportDownloadBtn">⬇ Download CSV</button>
+    </div>
+    <div style="max-height:260px;overflow-y:auto;border:1px solid #e2e2e2;border-radius:8px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;" id="reportDetailTable">
+        <thead>
+          <tr style="background:#f5f5f5;text-align:left;">
+            <th style="padding:6px 8px;">Name</th>
+            <th style="padding:6px 8px;">Box</th>
+            <th style="padding:6px 8px;">Date</th>
+            <th style="padding:6px 8px;">Time</th>
+            <th style="padding:6px 8px;">Mode</th>
+            <th style="padding:6px 8px;">Collected By</th>
+            <th style="padding:6px 8px;text-align:right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="reportDetailBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -840,10 +861,11 @@
   function saveCategories(){ localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories)); pushToCloud(); }
   function saveStaff(){ localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff)); pushToCloud(); }
   function saveActivity(){ localStorage.setItem(ACTIVITY_KEY, JSON.stringify(state.activityLog)); pushToCloud(); }
-  function logActivity(action, boxId, customerName, extra){
+  function logActivity(action, boxId, customerName, extra, meta){
     var actor = "Unknown";
     if(state.session){ actor = state.session.role === "office" ? "Office" : state.session.staffName; }
     var entry = { time: Date.now(), actor: actor, action: action, box: boxId, name: customerName || "", extra: extra || "" };
+    if(meta) entry.meta = meta;
     state.activityLog.unshift(entry);
     if(state.activityLog.length > 300){ state.activityLog = state.activityLog.slice(0, 300); }
     saveActivity();
@@ -1443,7 +1465,8 @@
       c.periodTo = periodTo;
       c.lastBillingNote = document.getElementById("modeNotes").value.trim();
       c.paidRecordedOn = datePaid;
-      logActivity("paid", id, c.name, m.toLowerCase() + " · " + collector + " · " + months + "mo · " + fmtMoney(collectedAmt));
+      logActivity("paid", id, c.name, m.toLowerCase() + " · " + collector + " · " + months + "mo · " + fmtMoney(collectedAmt),
+        { amount: collectedAmt, mode: m.toLowerCase(), collector: collector, months: months });
       saveData(); hideOverlay("modeOverlay"); renderAll();
     });
   });
@@ -1889,7 +1912,78 @@
       subEl.textContent = t("reportSub");
     }
     drawPie(counts);
+    renderReportDetail(fromDate, toDate);
   }
+  function reportDayStr(ts){
+    var d = new Date(ts);
+    var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+    return y + "-" + m + "-" + day;
+  }
+  var lastReportDetailRows = [];
+  function renderReportDetail(fromDate, toDate){
+    var rows = state.activityLog.filter(function(e){
+      if(e.action !== "paid") return false;
+      if(!isBoxVisible(e.box)) return false;
+      var day = reportDayStr(e.time);
+      if(fromDate && day < fromDate) return false;
+      if(toDate && day > toDate) return false;
+      return true;
+    });
+    lastReportDetailRows = rows;
+    var body = document.getElementById("reportDetailBody");
+    if(!rows.length){
+      body.innerHTML = "<tr><td colspan='7' style='padding:10px;text-align:center;color:#888;'>No payments in this range</td></tr>";
+      return;
+    }
+    body.innerHTML = rows.map(function(e){
+      var d = new Date(e.time);
+      var dateStr = d.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+      var timeStr = d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" });
+      var amount = e.meta && e.meta.amount != null ? e.meta.amount : (parseFloat((e.extra||"").replace(/[^\d.]/g,"")) || 0);
+      var mode = e.meta && e.meta.mode ? e.meta.mode.toUpperCase() : "";
+      var collector = e.meta && e.meta.collector ? e.meta.collector : "";
+      return "<tr style='border-top:1px solid #eee;'>" +
+        "<td style='padding:6px 8px;'>"+escapeHtml(e.name||"")+"</td>" +
+        "<td style='padding:6px 8px;'>"+escapeHtml(e.box||"")+"</td>" +
+        "<td style='padding:6px 8px;'>"+dateStr+"</td>" +
+        "<td style='padding:6px 8px;'>"+timeStr+"</td>" +
+        "<td style='padding:6px 8px;'>"+escapeHtml(mode)+"</td>" +
+        "<td style='padding:6px 8px;'>"+escapeHtml(collector)+"</td>" +
+        "<td style='padding:6px 8px;text-align:right;'>"+fmtMoney(amount)+"</td>" +
+        "</tr>";
+    }).join("");
+  }
+  document.getElementById("reportDownloadBtn").addEventListener("click", function(){
+    if(!lastReportDetailRows.length){ alert("No payments in this range to download."); return; }
+    var header = ["Name","Box","Date","Time","Mode","Collected By","Amount"];
+    var lines = [header.join(",")];
+    lastReportDetailRows.forEach(function(e){
+      var d = new Date(e.time);
+      var dateStr = d.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+      var timeStr = d.toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit" });
+      var amount = e.meta && e.meta.amount != null ? e.meta.amount : (parseFloat((e.extra||"").replace(/[^\d.]/g,"")) || 0);
+      var mode = e.meta && e.meta.mode ? e.meta.mode.toUpperCase() : "";
+      var collector = e.meta && e.meta.collector ? e.meta.collector : "";
+      var row = [e.name||"", e.box||"", dateStr, timeStr, mode, collector, amount];
+      lines.push(row.map(function(v){
+        var s = String(v).replace(/"/g,'""');
+        return /[",\n]/.test(s) ? '"'+s+'"' : s;
+      }).join(","));
+    });
+    var csv = lines.join("\n");
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var fromDate = document.getElementById("reportDateFrom").value;
+    var toDate = document.getElementById("reportDateTo").value;
+    var suffix = (fromDate || toDate) ? ((fromDate||"start")+"_to_"+(toDate||"end")) : "all";
+    a.href = url;
+    a.download = "collection-report_" + suffix + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
   function setReportRange(from, to){
     document.getElementById("reportDateFrom").value = from || "";
     document.getElementById("reportDateTo").value = to || "";

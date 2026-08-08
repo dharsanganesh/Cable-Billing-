@@ -204,6 +204,10 @@
   </div>
 </header>
 
+<div id="licenseBanner" style="display:none;background:#fff8e1;border-bottom:1px solid #f0e0a0;color:#7a5c00;padding:8px 16px;font-size:13px;text-align:center;">
+  <span id="licenseBannerText">Renewal due — please contact us to continue support.</span>
+</div>
+
 <div class="summary-wrap">
   <div class="summary-grid" id="summaryGrid"></div>
 </div>
@@ -347,6 +351,36 @@
     <div class="modal-actions">
       <button class="btn btn-accent" id="saveSettingsBtn">Save Details</button>
     </div>
+    <hr style="margin:16px 0;border:none;border-top:1px solid #eee;">
+    <button class="btn btn-outline" id="openPrepareCopyBtn" style="width:100%;">🧾 Prepare Customer Copy (for selling)</button>
+  </div>
+</div>
+
+<!-- Prepare Customer Copy tool (seller-only, for packaging licensed copies to sell) -->
+<div class="overlay" id="prepareCopyOverlay">
+  <div class="modal">
+    <button class="close-x" data-close="prepareCopyOverlay">✕</button>
+    <h2>Prepare Customer Copy</h2>
+    <div class="sub">Package a licensed copy of this app for a new customer. This never touches any shop's actual data — only your own license Firebase project.</div>
+    <div class="field">
+      <label>Your License Firebase Config</label>
+      <textarea id="pcLicenseConfig" rows="5" placeholder='Paste your license project firebaseConfig here (saved for reuse next time), e.g. { "apiKey": "...", "databaseURL": "...", ... }'></textarea>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Customer License Key</label>
+        <input id="pcLicenseKey" type="text" placeholder="e.g. shivashankar-supreme-fiber" />
+      </div>
+      <div class="field">
+        <label>Renewal Due Date</label>
+        <input id="pcDueDate" type="date" />
+      </div>
+    </div>
+    <div class="hint" id="pcStatus" style="margin-bottom:10px;"></div>
+    <div class="modal-actions" style="flex-direction:column;gap:8px;">
+      <button class="btn btn-accent" id="pcSetLicenseBtn" style="width:100%;">☁ Set Due Date in License Firebase</button>
+      <button class="btn btn-outline" id="pcDownloadBtn" style="width:100%;">⬇ Generate &amp; Download Customer File</button>
+    </div>
   </div>
 </div>
 
@@ -363,6 +397,16 @@
       <div class="field">
         <label id="lblModeMobile">Mobile</label>
         <input id="modeMobileDisplay" type="text" disabled />
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label id="lblModeStb">STB / Box No</label>
+        <input id="modeStbDisplay" type="text" disabled />
+      </div>
+      <div class="field">
+        <label id="lblModeStatus">Status</label>
+        <input id="modeStatusDisplay" type="text" disabled />
       </div>
     </div>
     <div class="row2">
@@ -395,6 +439,16 @@
           <label id="lblModeTo">To</label>
           <input id="modePeriodTo" type="date" />
         </div>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label id="lblModeLastPayment">Last Payment (new)</label>
+        <input id="modeLastPaymentDisplay" type="text" disabled />
+      </div>
+      <div class="field">
+        <label id="lblModeNextPayment">Next Payment</label>
+        <input id="modeNextPaymentDisplay" type="text" disabled />
       </div>
     </div>
     <div class="row2">
@@ -639,6 +693,20 @@
   var ACTIVITY_KEY = "cabletv_billing_activity_v1";
   var LANG_KEY = "cabletv_billing_lang_v1";
 
+  // ---------- AMC / License check (optional, off by default) ----------
+  // This is SEPARATE from the shop's own Cloud Sync Firebase — it never touches
+  // or reads any customer data. It only checks a renewal due-date.
+  // To enable when packaging a copy for a paying customer:
+  //   1. Create your OWN small Firebase project (just for licenses, not shop data).
+  //   2. Enable Realtime Database. Add a node: licenses/<LICENSE_KEY>/dueDate = "YYYY-MM-DD"
+  //   3. Fill in SELLER_LICENSE_CONFIG below with that project's config.
+  //   4. Set LICENSE_KEY to a unique id for this particular customer's copy.
+  // Leave LICENSE_KEY empty (as it is now) to disable this entirely — the app
+  // then behaves exactly as it does today, with no check of any kind.
+  var SELLER_LICENSE_CONFIG = null; // e.g. { apiKey:"...", databaseURL:"...", ... }
+  var LICENSE_KEY = ""; // e.g. "shivashankar-supreme-fiber"
+  var LICENSE_GRACE_DAYS = 30;
+
   var DEFAULT_CATEGORIES = [
     { code:"U", max:200 },
     { code:"A", max:200 },
@@ -666,6 +734,7 @@
       lblStb:"STB / Box No (optional)",
       lblModeName:"Name", lblModeMobile:"Mobile", lblModePlanAmount:"Plan Amount (₹)", lblModeAmountReceived:"Amount Received (₹)",
       lblModePeriod:"For a Period of", lblModeFrom:"From", lblModeTo:"To", lblModeDatePaid:"Date Paid", lblModeCurrentDate:"Current Date",
+      lblModeStb:"STB / Box No", lblModeStatus:"Status", lblModeLastPayment:"Last Payment (new)", lblModeNextPayment:"Next Payment",
       lblModeNotes:"Notes (optional)", lblModeMode:"Mode",
       staffBtn:"👤 Staff", staffTitle:"Manage Staff", staffSub:"Add the names of members who collect payments",
       lblNewStaff:"New Staff Name", addStaffBtn:"➕ Add Staff", staffExists:"This staff name already exists.",
@@ -738,6 +807,7 @@
       lblStb:"STB / பாக்ஸ் எண் (விருப்பம்)",
       lblModeName:"பெயர்", lblModeMobile:"மொபைல்", lblModePlanAmount:"திட்ட தொகை (₹)", lblModeAmountReceived:"பெறப்பட்ட தொகை (₹)",
       lblModePeriod:"எந்த காலத்திற்கு", lblModeFrom:"தொடக்கம்", lblModeTo:"முடிவு", lblModeDatePaid:"செலுத்திய தேதி", lblModeCurrentDate:"இன்றைய தேதி",
+      lblModeStb:"STB / பாக்ஸ் எண்", lblModeStatus:"நிலை", lblModeLastPayment:"கடைசி கட்டணம் (புதியது)", lblModeNextPayment:"அடுத்த கட்டணம்",
       lblModeNotes:"குறிப்புகள் (விருப்பம்)", lblModeMode:"முறை",
       staffBtn:"👤 ஊழியர்", staffTitle:"ஊழியர்களை நிர்வகி", staffSub:"பணம் வசூலிக்கும் நபர்களின் பெயர்களைச் சேர்க்கவும்",
       lblNewStaff:"புதிய ஊழியர் பெயர்", addStaffBtn:"➕ ஊழியரைச் சேர்", staffExists:"இந்த பெயர் ஏற்கனவே உள்ளது.",
@@ -918,6 +988,10 @@
     document.getElementById("lblModeFrom").textContent = t("lblModeFrom");
     document.getElementById("lblModeTo").textContent = t("lblModeTo");
     document.getElementById("lblModeDatePaid").textContent = t("lblModeDatePaid");
+    document.getElementById("lblModeStb").textContent = t("lblModeStb");
+    document.getElementById("lblModeStatus").textContent = t("lblModeStatus");
+    document.getElementById("lblModeLastPayment").textContent = t("lblModeLastPayment");
+    document.getElementById("lblModeNextPayment").textContent = t("lblModeNextPayment");
     document.getElementById("lblModeCurrentDate").textContent = t("lblModeCurrentDate");
     document.getElementById("lblModeNotes").textContent = t("lblModeNotes");
     document.getElementById("lblModeMode").textContent = t("lblModeMode");
@@ -1413,12 +1487,17 @@
       var from = document.getElementById("modePeriodFrom").value;
       document.getElementById("modePeriodTo").value = addMonthsToDate(from, months);
     }
+    var periodToNow = document.getElementById("modePeriodTo").value;
+    document.getElementById("modeLastPaymentDisplay").value = fmtPeriodDate(periodToNow);
+    document.getElementById("modeNextPaymentDisplay").value = fmtPeriodDate(addMonthsToDate(periodToNow, 1));
   }
   function openModePopup(id){
     modePopupTargetId = id;
     var c = state.data[id];
     document.getElementById("modeNameDisplay").value = c.name || "";
     document.getElementById("modeMobileDisplay").value = c.mobile || "";
+    document.getElementById("modeStbDisplay").value = c.stb || id || "";
+    document.getElementById("modeStatusDisplay").value = (c.status || "").toUpperCase();
     document.getElementById("modePlanAmountDisplay").value = fmtMoney(c.amount);
     var sel = document.getElementById("modeCollectorSelect");
     var field = document.getElementById("modeCollectorField");
@@ -1726,6 +1805,102 @@
     reader.readAsText(file);
     e.target.value = "";
   });
+
+  // ---------- Prepare Customer Copy (seller tool, for packaging licensed sales) ----------
+  var PC_CONFIG_KEY = "cabletv_billing_pc_license_config_v1";
+  document.getElementById("openPrepareCopyBtn").addEventListener("click", function(){
+    var saved = "";
+    try{ saved = localStorage.getItem(PC_CONFIG_KEY) || ""; }catch(e){}
+    if(saved) document.getElementById("pcLicenseConfig").value = saved;
+    document.getElementById("pcStatus").textContent = "";
+    hideOverlay("settingsOverlay");
+    showOverlay("prepareCopyOverlay");
+  });
+  function pcParseConfig(){
+    var raw = document.getElementById("pcLicenseConfig").value.trim();
+    if(!raw) return null;
+    return parseFirebaseConfigInput(raw);
+  }
+  document.getElementById("pcSetLicenseBtn").addEventListener("click", function(){
+    var status = document.getElementById("pcStatus");
+    var config = pcParseConfig();
+    var key = document.getElementById("pcLicenseKey").value.trim();
+    var dueDate = document.getElementById("pcDueDate").value;
+    if(!config){ status.textContent = "Couldn't read the Firebase config — paste the whole config block."; return; }
+    if(!key){ status.textContent = "Enter a license key for this customer."; return; }
+    if(!dueDate){ status.textContent = "Pick a renewal due date."; return; }
+    try{ localStorage.setItem(PC_CONFIG_KEY, document.getElementById("pcLicenseConfig").value.trim()); }catch(e){}
+    status.textContent = "Connecting...";
+    loadFirebaseSDK(function(){
+      try{
+        var existing = (window.firebase.apps || []).filter(function(a){ return a.name === "pcLicenseApp"; });
+        existing.forEach(function(a){ try{ a.delete(); }catch(e){} });
+        var pcApp = firebase.initializeApp(config, "pcLicenseApp");
+        var pcDb = firebase.database(pcApp);
+        pcDb.ref("licenses/" + key + "/dueDate").set(dueDate).then(function(){
+          status.textContent = "✓ Due date saved to your license Firebase for \"" + key + "\".";
+        }).catch(function(err){
+          status.textContent = "Couldn't write to Firebase: " + (err && err.message ? err.message : "check your config/rules.");
+        });
+      }catch(e){
+        status.textContent = "Couldn't connect: " + (e && e.message ? e.message : "check your config.");
+      }
+    }, function(){ status.textContent = "Couldn't load Firebase SDK — check your internet connection."; });
+  });
+  document.getElementById("pcDownloadBtn").addEventListener("click", function(){
+    var status = document.getElementById("pcStatus");
+    var configRaw = document.getElementById("pcLicenseConfig").value.trim();
+    var config = pcParseConfig();
+    var key = document.getElementById("pcLicenseKey").value.trim();
+    if(!config){ status.textContent = "Couldn't read the Firebase config — paste the whole config block."; return; }
+    if(!key){ status.textContent = "Enter a license key for this customer."; return; }
+    try{ localStorage.setItem(PC_CONFIG_KEY, configRaw); }catch(e){}
+    status.textContent = "Preparing file...";
+    fetch(window.location.href).then(function(r){ return r.text(); }).then(function(sourceHtml){
+      var configLiteral = JSON.stringify(config);
+      var patched = sourceHtml
+        .replace(/var SELLER_LICENSE_CONFIG\s*=\s*[^;]*;/, "var SELLER_LICENSE_CONFIG = " + configLiteral + ";")
+        .replace(/var LICENSE_KEY\s*=\s*[^;]*;/, "var LICENSE_KEY = " + JSON.stringify(key) + ";");
+      if(patched === sourceHtml){
+        status.textContent = "Couldn't find the license placeholders in the file to update — download it manually and edit it instead.";
+        return;
+      }
+      var blob = new Blob([patched], { type: "text/html;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = key.replace(/[^a-z0-9\-]+/gi, "-") + "-billing-app.html";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      status.textContent = "✓ Downloaded — this file is ready to send to the customer.";
+    }).catch(function(){
+      status.textContent = "Couldn't fetch this file's own source (this can happen if it's opened as a local file rather than a web page). Download it manually and edit SELLER_LICENSE_CONFIG / LICENSE_KEY yourself instead.";
+    });
+  });
+
+  function checkLicenseStatus(){
+    if(!LICENSE_KEY || !SELLER_LICENSE_CONFIG) return; // disabled — this copy has no license configured
+    loadFirebaseSDK(function(){
+      try{
+        var licenseApp;
+        var existing = (window.firebase.apps || []).filter(function(a){ return a.name === "licenseApp"; });
+        licenseApp = existing.length ? existing[0] : firebase.initializeApp(SELLER_LICENSE_CONFIG, "licenseApp");
+        var licenseDb = firebase.database(licenseApp);
+        licenseDb.ref("licenses/" + LICENSE_KEY + "/dueDate").once("value").then(function(snap){
+          var dueDate = snap.val();
+          if(!dueDate) return; // no due date set for this key — say nothing
+          var due = new Date(dueDate + "T00:00:00");
+          if(isNaN(due.getTime())) return;
+          due.setDate(due.getDate() + LICENSE_GRACE_DAYS);
+          if(new Date() > due){
+            document.getElementById("licenseBanner").style.display = "";
+          }
+        }).catch(function(){ /* offline or misconfigured — fail silently, never block */ });
+      }catch(e){ /* fail silently */ }
+    }, function(){ /* SDK failed to load — fail silently */ });
+  }
 
   // ---------- Cloud Sync (Firebase) ----------
   function loadSyncConfig(){
@@ -2344,6 +2519,8 @@
   if(savedSync && savedSync.enabled && savedSync.config && savedSync.roomId){
     connectSync(savedSync.config, savedSync.roomId, true);
   }
+
+  checkLicenseStatus();
 
 })();
 </script>

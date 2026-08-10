@@ -949,7 +949,15 @@
 
   // ---------- Helpers ----------
   function fmtMoney(n){ n = Number(n)||0; return "₹" + n.toLocaleString("en-IN"); }
-  function fmtPeriodDate(s){ s = s || ""; return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(2) : s; }
+  function fmtPeriodDate(s){
+    s = s || "";
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if(!m) return s;
+    var yy = m[1].slice(2);
+    var mm = m[2];
+    var dd = String(parseInt(m[3], 10)); // drop any leading zero on the day
+    return dd + "." + mm + "." + yy;
+  }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
   function cleanMobile(m){ return (m||"").replace(/\D/g,""); }
   function waNumber(m){ var d = cleanMobile(m); if(d.length===10) d = "91"+d; return d; }

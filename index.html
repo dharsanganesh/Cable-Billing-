@@ -296,6 +296,11 @@
       <textarea id="fNotes" rows="2" placeholder="Address, connection notes, etc."></textarea>
     </div>
 
+    <div class="field" id="custHistoryField" style="display:none;">
+      <label id="lblHistory">Payment History</label>
+      <div id="custHistoryList" style="max-height:180px;overflow-y:auto;border:1px solid #e2e2e2;border-radius:7px;padding:4px 8px;background:#fbfcfd;"></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn btn-outline" id="deleteCustBtn">🗑 Remove</button>
       <button class="btn btn-paid" id="billFromModalBtn" style="display:none;">🧾 Generate Bill</button>
@@ -790,7 +795,8 @@
       lblActivityFrom:"From", lblActivityTo:"To", activityClearBtn:"Show All", activityDownloadBtn:"⬇ Download",
       activityTodayBtn:"Today", activityLast7Btn:"Last 7 Days", activityLast15Btn:"Last 15 Days", activityThisMonthBtn:"This Month",
       lineAdded:"Line added successfully.",
-      deleteLineBtn:"Remove"
+      deleteLineBtn:"Remove",
+      lblHistory:"Payment History", noPaymentHistory:"No payment history yet."
     },
     ta:{
       tagline:"வாடிக்கையாளர் & பில்லிங் மேலாளர்",
@@ -863,7 +869,8 @@
       lblActivityFrom:"தொடக்கம்", lblActivityTo:"முடிவு", activityClearBtn:"அனைத்தும் காட்டு", activityDownloadBtn:"⬇ பதிவிறக்கு",
       activityTodayBtn:"இன்று", activityLast7Btn:"கடந்த 7 நாட்கள்", activityLast15Btn:"கடந்த 15 நாட்கள்", activityThisMonthBtn:"இந்த மாதம்",
       lineAdded:"வரிசை வெற்றிகரமாக சேர்க்கப்பட்டது.",
-      deleteLineBtn:"நீக்கு"
+      deleteLineBtn:"நீக்கு",
+      lblHistory:"கட்டண வரலாறு", noPaymentHistory:"இதுவரை கட்டண வரலாறு இல்லை."
     }
   };
 
@@ -1042,6 +1049,7 @@
     document.getElementById("syncHelp").textContent = t("syncHelp");
     updateSyncStatus(syncEnabled ? "connected" : "off");
     document.getElementById("lblNotes").textContent = t("lblNotes");
+    document.getElementById("lblHistory").textContent = t("lblHistory");
     document.getElementById("optPaid").textContent = t("optPaid");
     document.getElementById("optUnpaid").textContent = t("optUnpaid");
     document.getElementById("optSuspended").textContent = t("optSuspended");
@@ -1562,6 +1570,33 @@
 
   // ---------- Customer Modal ----------
   var pendingStatus = "unpaid";
+  function renderCustHistory(id, hasCustomer){
+    var wrap = document.getElementById("custHistoryField");
+    var list = document.getElementById("custHistoryList");
+    if(!hasCustomer){ wrap.style.display = "none"; list.innerHTML = ""; return; }
+    var rows = state.activityLog.filter(function(e){ return e.action === "paid" && e.box === id; });
+    wrap.style.display = "";
+    if(!rows.length){
+      list.innerHTML = "<div style='padding:8px 2px;color:var(--muted);font-size:12.5px;'>"+t("noPaymentHistory")+"</div>";
+      return;
+    }
+    list.innerHTML = rows.map(function(e){
+      var d = new Date(e.time);
+      var dateStr = d.toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+      var amount = e.meta && e.meta.amount != null ? e.meta.amount : (parseFloat((e.extra||"").replace(/[^\d.]/g,"")) || 0);
+      var mode = e.meta && e.meta.mode ? e.meta.mode.toUpperCase() : "";
+      var collector = e.meta && e.meta.collector ? e.meta.collector : "";
+      var months = e.meta && e.meta.months;
+      var monthsTxt = months && months > 1 ? " ("+months+"mo)" : "";
+      var subParts = [dateStr + monthsTxt];
+      if(mode) subParts.push(mode);
+      if(collector) subParts.push(escapeHtml(collector));
+      return "<div style='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eef1f4;font-size:12.5px;'>"+
+        "<span>"+subParts.join(" · ")+"</span>"+
+        "<span style='font-weight:700;color:var(--paid-dark);'>"+fmtMoney(amount)+"</span>"+
+        "</div>";
+    }).join("");
+  }
   function openCustomerModal(id, c){
     state.activeBox = id;
     document.getElementById("custModalTitle").textContent = c ? t("editTitle") : t("addTitle");
@@ -1583,6 +1618,7 @@
       document.getElementById("fCollector").value = hasName2 ? c.collector : "Office";
     }
     document.getElementById("fNotes").value = c ? c.notes || "" : "";
+    renderCustHistory(id, !!c);
     pendingStatus = c ? c.status || "unpaid" : "unpaid";
     updateStatusPicker();
     document.getElementById("deleteCustBtn").style.display = c ? "inline-block" : "none";

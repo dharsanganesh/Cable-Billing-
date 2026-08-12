@@ -206,6 +206,19 @@
 
 <div id="licenseBanner" style="display:none;background:#fff8e1;border-bottom:1px solid #f0e0a0;color:#7a5c00;padding:8px 16px;font-size:13px;text-align:center;">
   <span id="licenseBannerText">Renewal due — please contact us to continue support.</span>
+  <span id="licenseBannerPayment" style="font-weight:700;"></span>
+</div>
+
+<!-- Trial/Subscription Standby Overlay — blocks the whole app when lapsed. Never closable. -->
+<div class="overlay show" id="trialLockedOverlay" style="display:none;z-index:200;">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:38px;margin-bottom:6px;">⏸</div>
+    <h2 id="trialLockedTitle">Subscription Paused</h2>
+    <div class="sub" id="trialLockedMsg" style="margin-bottom:14px;">Your trial or subscription period has ended. Your data is safe and untouched — please contact us to continue.</div>
+    <div class="hint" id="trialLockedContact" style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px;"></div>
+    <div class="hint" id="trialLockedPayment" style="font-size:13.5px;font-weight:700;color:var(--paid-dark);background:#f0f9f3;border:1px solid #cdeddb;border-radius:8px;padding:8px 10px;margin-bottom:16px;display:none;"></div>
+    <button class="btn btn-accent" id="trialLockedRecheckBtn" style="width:100%;">🔄 <span id="trialLockedRecheckLabel">I've Renewed — Check Again</span></button>
+  </div>
 </div>
 
 <div class="summary-wrap">
@@ -331,6 +344,12 @@
     <button class="close-x" data-close="settingsOverlay">✕</button>
     <h2 id="settingsTitle">Shop Details</h2>
     <div class="sub" id="settingsSub">Shown on printed / sent receipts</div>
+    <div id="renewalInfoCard" style="display:none;border:1px solid #d8dee4;border-radius:9px;padding:10px 12px;margin-bottom:16px;background:#fbfcfd;">
+      <div style="font-weight:800;font-size:13px;color:var(--navy);margin-bottom:4px;">Subscription</div>
+      <div id="renewalInfoStatus" style="font-size:12.5px;margin-bottom:4px;"></div>
+      <div id="renewalInfoContact" style="font-size:12.5px;color:var(--muted);"></div>
+      <div id="renewalInfoPayment" style="font-size:12.5px;font-weight:700;color:var(--paid-dark);margin-top:4px;"></div>
+    </div>
     <div class="field">
       <label id="lblShopName">Shop Name</label>
       <input id="setShopName" type="text" />
@@ -371,21 +390,46 @@
       <label>Your License Firebase Config</label>
       <textarea id="pcLicenseConfig" rows="5" placeholder='Paste your license project firebaseConfig here (saved for reuse next time), e.g. { "apiKey": "...", "databaseURL": "...", ... }'></textarea>
     </div>
+    <div class="field">
+      <label>Your Contact Info <span style="font-weight:400;color:var(--muted);">(shown to the customer if their copy is paused)</span></label>
+      <input id="pcContactInfo" type="text" placeholder="e.g. WhatsApp 98765 43210" />
+    </div>
+    <div class="field">
+      <label>Your Payment Details <span style="font-weight:400;color:var(--muted);">(shown to the customer so they can pay you directly)</span></label>
+      <input id="pcPaymentInfo" type="text" placeholder="e.g. UPI: yourshop@upi" />
+    </div>
     <div class="row2">
+      <div class="field">
+        <label>Customer Name <span style="font-weight:400;color:var(--muted);">(for your own reference)</span></label>
+        <input id="pcCustomerName" type="text" placeholder="e.g. Balamurugan Cable TV" />
+      </div>
       <div class="field">
         <label>Customer License Key</label>
         <input id="pcLicenseKey" type="text" placeholder="e.g. shivashankar-supreme-fiber" />
       </div>
-      <div class="field">
-        <label>Renewal Due Date</label>
-        <input id="pcDueDate" type="date" />
-      </div>
     </div>
+    <div class="field">
+      <label>Set/Extend Due Date <span style="font-weight:400;color:var(--muted);">(optional)</span></label>
+      <input id="pcDueDate" type="date" />
+    </div>
+    <div class="hint" style="margin-bottom:10px;">New customers get a 3-month trial automatically from the day they first open the app — you don't need to set a due date for them. Use the date field above only when renewing an existing customer (pick their new due date and click "Set/Extend" below) or if you want to override the trial length for someone.</div>
     <div class="hint" id="pcStatus" style="margin-bottom:10px;"></div>
     <div class="modal-actions" style="flex-direction:column;gap:8px;">
-      <button class="btn btn-accent" id="pcSetLicenseBtn" style="width:100%;">☁ Set Due Date in License Firebase</button>
+      <button class="btn btn-accent" id="pcSetLicenseBtn" style="width:100%;">☁ Set/Extend Due Date in License Firebase</button>
       <button class="btn btn-outline" id="pcDownloadBtn" style="width:100%;">⬇ Generate &amp; Download Customer File</button>
+      <button class="btn btn-outline" id="pcViewAllBtn" style="width:100%;">📋 View / Renew All Customers</button>
     </div>
+  </div>
+</div>
+
+<!-- My Customers list — every license in the seller's Firebase, with quick inline renewal -->
+<div class="overlay" id="myCustomersOverlay">
+  <div class="modal wide">
+    <button class="close-x" data-close="myCustomersOverlay">✕</button>
+    <h2>My Customers</h2>
+    <div class="sub">Everyone you've sold a copy to, pulled from your license Firebase. Soonest due date first.</div>
+    <div class="hint" id="mcStatus" style="margin-bottom:10px;"></div>
+    <div id="myCustomersList" style="max-height:460px;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -700,17 +744,27 @@
 
   // ---------- AMC / License check (optional, off by default) ----------
   // This is SEPARATE from the shop's own Cloud Sync Firebase — it never touches
-  // or reads any customer data. It only checks a renewal due-date.
+  // or reads any customer data. It only checks a renewal due-date, and it locks
+  // the app (not just this shop's data — the app never touches customer data
+  // either way) once that date plus a grace period has passed.
   // To enable when packaging a copy for a paying customer:
   //   1. Create your OWN small Firebase project (just for licenses, not shop data).
-  //   2. Enable Realtime Database. Add a node: licenses/<LICENSE_KEY>/dueDate = "YYYY-MM-DD"
-  //   3. Fill in SELLER_LICENSE_CONFIG below with that project's config.
-  //   4. Set LICENSE_KEY to a unique id for this particular customer's copy.
+  //   2. Fill in SELLER_LICENSE_CONFIG below with that project's config.
+  //   3. Set LICENSE_KEY to a unique id for this particular customer's copy.
   // Leave LICENSE_KEY empty (as it is now) to disable this entirely — the app
   // then behaves exactly as it does today, with no check of any kind.
+  // You do NOT need to set a due date yourself for a new customer — the first
+  // time their copy opens, it automatically records "trial started today" in
+  // your license Firebase and gives them LICENSE_TRIAL_MONTHS from that date.
+  // To renew someone, use "Prepare Customer Copy" > Set/Extend Due Date — no
+  // new file needed, their copy unlocks itself next time it's online.
   var SELLER_LICENSE_CONFIG = null; // e.g. { apiKey:"...", databaseURL:"...", ... }
   var LICENSE_KEY = ""; // e.g. "shivashankar-supreme-fiber"
-  var LICENSE_GRACE_DAYS = 30;
+  var LICENSE_TRIAL_MONTHS = 3;
+  var LICENSE_GRACE_DAYS = 7;
+  var TRIAL_LOCAL_DUE_KEY = "cabletv_billing_trial_local_due_v1";
+  var TRIAL_LOCAL_CONTACT_KEY = "cabletv_billing_trial_local_contact_v1";
+  var TRIAL_LOCAL_PAYMENT_KEY = "cabletv_billing_trial_local_payment_v1";
 
   var DEFAULT_CATEGORIES = [
     { code:"U", max:200 },
@@ -796,7 +850,10 @@
       activityTodayBtn:"Today", activityLast7Btn:"Last 7 Days", activityLast15Btn:"Last 15 Days", activityThisMonthBtn:"This Month",
       lineAdded:"Line added successfully.",
       deleteLineBtn:"Remove",
-      lblHistory:"Payment History", noPaymentHistory:"No payment history yet."
+      lblHistory:"Payment History", noPaymentHistory:"No payment history yet.",
+      trialLockedTitle:"Subscription Paused", trialLockedMsg:"Your trial or subscription period has ended. Your data is safe and untouched — please contact us to continue.",
+      trialLockedRecheckLabel:"I've Renewed — Check Again",
+      licenseDueSoonText:"Your subscription is due for renewal soon — please contact"
     },
     ta:{
       tagline:"வாடிக்கையாளர் & பில்லிங் மேலாளர்",
@@ -870,7 +927,10 @@
       activityTodayBtn:"இன்று", activityLast7Btn:"கடந்த 7 நாட்கள்", activityLast15Btn:"கடந்த 15 நாட்கள்", activityThisMonthBtn:"இந்த மாதம்",
       lineAdded:"வரிசை வெற்றிகரமாக சேர்க்கப்பட்டது.",
       deleteLineBtn:"நீக்கு",
-      lblHistory:"கட்டண வரலாறு", noPaymentHistory:"இதுவரை கட்டண வரலாறு இல்லை."
+      lblHistory:"கட்டண வரலாறு", noPaymentHistory:"இதுவரை கட்டண வரலாறு இல்லை.",
+      trialLockedTitle:"சந்தா இடைநிறுத்தப்பட்டது", trialLockedMsg:"உங்கள் trial அல்லது சந்தா காலம் முடிந்துவிட்டது. உங்கள் தரவு பாதுகாப்பாக உள்ளது — தொடர எங்களை தொடர்பு கொள்ளவும்.",
+      trialLockedRecheckLabel:"புதுப்பித்தேன் — மீண்டும் சரிபார்",
+      licenseDueSoonText:"உங்கள் சந்தா விரைவில் புதுப்பிக்கப்பட வேண்டும் — தொடர்பு கொள்ளவும்"
     }
   };
 
@@ -1050,6 +1110,9 @@
     updateSyncStatus(syncEnabled ? "connected" : "off");
     document.getElementById("lblNotes").textContent = t("lblNotes");
     document.getElementById("lblHistory").textContent = t("lblHistory");
+    document.getElementById("trialLockedTitle").textContent = t("trialLockedTitle");
+    document.getElementById("trialLockedMsg").textContent = t("trialLockedMsg");
+    document.getElementById("trialLockedRecheckLabel").textContent = t("trialLockedRecheckLabel");
     document.getElementById("optPaid").textContent = t("optPaid");
     document.getElementById("optUnpaid").textContent = t("optUnpaid");
     document.getElementById("optSuspended").textContent = t("optSuspended");
@@ -1521,9 +1584,12 @@
       sel.value = state.session.staffName;
       field.style.display = "none";
     }else{
+      // Office is doing this billing right now — default to "Office", not
+      // whoever collected this customer's last payment. Office can still
+      // change the dropdown if they're recording a payment a staff member
+      // physically collected, but it should never be silently pre-filled.
       field.style.display = "";
-      var hasName = c && c.collector && (c.collector === "Office" || state.staff.some(function(s){ return s.name === c.collector; }));
-      sel.value = hasName ? c.collector : "Office";
+      sel.value = "Office";
     }
     document.getElementById("modeMonthsSelect").value = "1";
     var today = todayStr();
@@ -1613,9 +1679,11 @@
       document.getElementById("fCollector").value = state.session.staffName;
       collectorField.style.display = "none";
     }else{
+      // Office is doing this edit right now — default to "Office", not
+      // whoever collected this customer's last payment, so it's never
+      // silently saved under a staff member who isn't even logged in.
       collectorField.style.display = "";
-      var hasName2 = c && c.collector && (c.collector === "Office" || state.staff.some(function(s){ return s.name === c.collector; }));
-      document.getElementById("fCollector").value = hasName2 ? c.collector : "Office";
+      document.getElementById("fCollector").value = "Office";
     }
     document.getElementById("fNotes").value = c ? c.notes || "" : "";
     renderCustHistory(id, !!c);
@@ -1802,6 +1870,7 @@
     document.getElementById("setPhone").value = state.settings.phone || "";
     document.getElementById("setUpi").value = state.settings.upi || "";
     document.getElementById("setOfficePin").value = state.settings.officePin || "1234";
+    refreshRenewalInfoCard();
     showOverlay("settingsOverlay");
   });
   document.getElementById("saveSettingsBtn").addEventListener("click", function(){
@@ -1859,10 +1928,18 @@
 
   // ---------- Prepare Customer Copy (seller tool, for packaging licensed sales) ----------
   var PC_CONFIG_KEY = "cabletv_billing_pc_license_config_v1";
+  var PC_CONTACT_KEY = "cabletv_billing_pc_contact_v1";
+  var PC_PAYMENT_KEY = "cabletv_billing_pc_payment_v1";
   document.getElementById("openPrepareCopyBtn").addEventListener("click", function(){
     var saved = "";
     try{ saved = localStorage.getItem(PC_CONFIG_KEY) || ""; }catch(e){}
     if(saved) document.getElementById("pcLicenseConfig").value = saved;
+    var savedContact = "";
+    try{ savedContact = localStorage.getItem(PC_CONTACT_KEY) || ""; }catch(e){}
+    if(savedContact) document.getElementById("pcContactInfo").value = savedContact;
+    var savedPayment = "";
+    try{ savedPayment = localStorage.getItem(PC_PAYMENT_KEY) || ""; }catch(e){}
+    if(savedPayment) document.getElementById("pcPaymentInfo").value = savedPayment;
     document.getElementById("pcStatus").textContent = "";
     hideOverlay("settingsOverlay");
     showOverlay("prepareCopyOverlay");
@@ -1872,24 +1949,37 @@
     if(!raw) return null;
     return parseFirebaseConfigInput(raw);
   }
+  function pcGetConnection(config){
+    var existing = (window.firebase.apps || []).filter(function(a){ return a.name === "pcLicenseApp"; });
+    existing.forEach(function(a){ try{ a.delete(); }catch(e){} });
+    var pcApp = firebase.initializeApp(config, "pcLicenseApp");
+    return firebase.database(pcApp);
+  }
   document.getElementById("pcSetLicenseBtn").addEventListener("click", function(){
     var status = document.getElementById("pcStatus");
     var config = pcParseConfig();
     var key = document.getElementById("pcLicenseKey").value.trim();
     var dueDate = document.getElementById("pcDueDate").value;
+    var contact = document.getElementById("pcContactInfo").value.trim();
+    var paymentInfo = document.getElementById("pcPaymentInfo").value.trim();
+    var customerName = document.getElementById("pcCustomerName").value.trim();
     if(!config){ status.textContent = "Couldn't read the Firebase config — paste the whole config block."; return; }
     if(!key){ status.textContent = "Enter a license key for this customer."; return; }
-    if(!dueDate){ status.textContent = "Pick a renewal due date."; return; }
+    if(!dueDate && !contact && !customerName && !paymentInfo){ status.textContent = "Enter a due date, name, contact and/or payment info to save."; return; }
     try{ localStorage.setItem(PC_CONFIG_KEY, document.getElementById("pcLicenseConfig").value.trim()); }catch(e){}
+    try{ if(contact) localStorage.setItem(PC_CONTACT_KEY, contact); }catch(e){}
+    try{ if(paymentInfo) localStorage.setItem(PC_PAYMENT_KEY, paymentInfo); }catch(e){}
     status.textContent = "Connecting...";
     loadFirebaseSDK(function(){
       try{
-        var existing = (window.firebase.apps || []).filter(function(a){ return a.name === "pcLicenseApp"; });
-        existing.forEach(function(a){ try{ a.delete(); }catch(e){} });
-        var pcApp = firebase.initializeApp(config, "pcLicenseApp");
-        var pcDb = firebase.database(pcApp);
-        pcDb.ref("licenses/" + key + "/dueDate").set(dueDate).then(function(){
-          status.textContent = "✓ Due date saved to your license Firebase for \"" + key + "\".";
+        var pcDb = pcGetConnection(config);
+        var updates = {};
+        if(dueDate) updates.dueDate = dueDate;
+        if(contact) updates.contact = contact;
+        if(paymentInfo) updates.paymentInfo = paymentInfo;
+        if(customerName) updates.customerName = customerName;
+        pcDb.ref("licenses/" + key).update(updates).then(function(){
+          status.textContent = "✓ Saved to your license Firebase for \"" + key + "\".";
         }).catch(function(err){
           status.textContent = "Couldn't write to Firebase: " + (err && err.message ? err.message : "check your config/rules.");
         });
@@ -1931,6 +2021,197 @@
     });
   });
 
+  // ---------- My Customers (list every license + renew inline) ----------
+  function mcStatusColor(dueDateStr){
+    var due = new Date(dueDateStr + "T00:00:00");
+    if(isNaN(due.getTime())) return { label:"Unknown", cls:"suspended" };
+    var graceEnd = new Date(due.getTime());
+    graceEnd.setDate(graceEnd.getDate() + LICENSE_GRACE_DAYS);
+    var now = new Date();
+    if(now > graceEnd) return { label:"Locked", cls:"unpaid" };
+    if(now > due) return { label:"Grace period", cls:"suspended" };
+    return { label:"Active", cls:"paid" };
+  }
+  function renderMyCustomersList(entries, pcDb){
+    var list = document.getElementById("myCustomersList");
+    if(!entries.length){
+      list.innerHTML = "<div class='empty-state'>No customer licenses found yet — use Prepare Customer Copy above to add your first one.</div>";
+      return;
+    }
+    entries.sort(function(a,b){
+      var da = a.val.dueDate || "9999-99-99", db = b.val.dueDate || "9999-99-99";
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
+    list.innerHTML = "";
+    entries.forEach(function(entry){
+      var key = entry.key, val = entry.val;
+      var status = mcStatusColor(val.dueDate || "");
+      var row = document.createElement("div");
+      row.style.cssText = "border:1px solid #e2e2e2;border-radius:9px;padding:10px 12px;margin-bottom:8px;";
+      var suggestedRenewal = val.dueDate ? addMonthsToPlainDate(val.dueDate, 12) : addMonthsToPlainDate(todayStr(), 12);
+      row.innerHTML =
+        "<div style='display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;'>" +
+          "<div>" +
+            "<div style='font-weight:800;font-size:14px;color:var(--navy);'>" + escapeHtml(val.customerName || key) + "</div>" +
+            "<div style='font-size:11.5px;color:var(--muted);font-family:monospace;'>" + escapeHtml(key) + "</div>" +
+            "<div style='font-size:12px;color:var(--muted);margin-top:2px;'>Due: " + escapeHtml(val.dueDate || "not set") + (val.contact ? " · " + escapeHtml(val.contact) : "") + "</div>" +
+          "</div>" +
+          "<span class='badge " + status.cls + "'>" + status.label + "</span>" +
+        "</div>" +
+        "<div style='display:flex;gap:6px;margin-top:8px;align-items:center;'>" +
+          "<input type='date' class='mcRenewDate' value='" + suggestedRenewal + "' style='padding:6px 8px;border:1px solid #ccd4dc;border-radius:6px;font-size:12.5px;flex:1;'>" +
+          "<button class='btn btn-sm btn-accent mcRenewBtn'>Renew</button>" +
+        "</div>";
+      row.querySelector(".mcRenewBtn").addEventListener("click", function(){
+        var btn = this;
+        var newDate = row.querySelector(".mcRenewDate").value;
+        if(!newDate){ alert("Pick a date first."); return; }
+        btn.disabled = true; btn.textContent = "…";
+        pcDb.ref("licenses/" + key + "/dueDate").set(newDate).then(function(){
+          val.dueDate = newDate;
+          var newStatus = mcStatusColor(newDate);
+          row.querySelector(".badge").className = "badge " + newStatus.cls;
+          row.querySelector(".badge").textContent = newStatus.label;
+          row.querySelector("div[style*='margin-top:2px']").innerHTML = "Due: " + escapeHtml(newDate) + (val.contact ? " · " + escapeHtml(val.contact) : "");
+          btn.disabled = false; btn.textContent = "Renew";
+        }).catch(function(err){
+          alert("Couldn't save: " + (err && err.message ? err.message : "check your connection."));
+          btn.disabled = false; btn.textContent = "Renew";
+        });
+      });
+      list.appendChild(row);
+    });
+  }
+  document.getElementById("pcViewAllBtn").addEventListener("click", function(){
+    var mcStatus = document.getElementById("mcStatus");
+    var config = pcParseConfig();
+    if(!config){ alert("Fill in your License Firebase Config above first."); return; }
+    document.getElementById("myCustomersList").innerHTML = "";
+    mcStatus.textContent = "Loading...";
+    showOverlay("myCustomersOverlay");
+    loadFirebaseSDK(function(){
+      try{
+        var pcDb = pcGetConnection(config);
+        pcDb.ref("licenses").once("value").then(function(snap){
+          var val = snap.val() || {};
+          var entries = Object.keys(val).map(function(k){ return { key:k, val: val[k] || {} }; });
+          mcStatus.textContent = entries.length ? "" : "";
+          renderMyCustomersList(entries, pcDb);
+        }).catch(function(err){
+          mcStatus.textContent = "Couldn't load: " + (err && err.message ? err.message : "check your config/rules.");
+        });
+      }catch(e){
+        mcStatus.textContent = "Couldn't connect: " + (e && e.message ? e.message : "check your config.");
+      }
+    }, function(){ mcStatus.textContent = "Couldn't load Firebase SDK — check your internet connection."; });
+  });
+
+  function addMonthsToPlainDate(dateStr, n){
+    var base = new Date(dateStr + "T00:00:00");
+    base.setMonth(base.getMonth() + n);
+    var y = base.getFullYear(), m = String(base.getMonth()+1).padStart(2,"0"), d = String(base.getDate()).padStart(2,"0");
+    return y + "-" + m + "-" + d;
+  }
+  function showTrialLock(contact, paymentInfo){
+    document.getElementById("trialLockedContact").textContent = contact || "";
+    var payEl = document.getElementById("trialLockedPayment");
+    if(paymentInfo){ payEl.textContent = "💳 " + paymentInfo; payEl.style.display = ""; }
+    else{ payEl.style.display = "none"; }
+    document.getElementById("trialLockedOverlay").style.display = "flex";
+  }
+  function hideTrialLock(){
+    document.getElementById("trialLockedOverlay").style.display = "none";
+  }
+  // Reads (or, on this device's very first-ever open, creates) the locally
+  // tracked trial due date. This works with no internet connection at all —
+  // the offline trial is entirely driven by the device's own clock.
+  function getOrInitLocalTrialDue(){
+    var due = null;
+    try{ due = localStorage.getItem(TRIAL_LOCAL_DUE_KEY); }catch(e){}
+    if(!due){
+      due = addMonthsToPlainDate(todayStr(), LICENSE_TRIAL_MONTHS);
+      try{ localStorage.setItem(TRIAL_LOCAL_DUE_KEY, due); }catch(e){}
+    }
+    return due;
+  }
+  function setLocalTrialDue(due){
+    try{ localStorage.setItem(TRIAL_LOCAL_DUE_KEY, due); }catch(e){}
+  }
+  // Contact/payment info is cached locally too, so the lock screen, the
+  // due-soon banner, and the Shop Details renewal card all still show the
+  // last-known details even with no internet at that moment.
+  function getLocalTrialInfo(){
+    var contact = "", paymentInfo = "";
+    try{ contact = localStorage.getItem(TRIAL_LOCAL_CONTACT_KEY) || ""; }catch(e){}
+    try{ paymentInfo = localStorage.getItem(TRIAL_LOCAL_PAYMENT_KEY) || ""; }catch(e){}
+    return { contact: contact, paymentInfo: paymentInfo };
+  }
+  function setLocalTrialInfo(contact, paymentInfo){
+    try{ if(contact) localStorage.setItem(TRIAL_LOCAL_CONTACT_KEY, contact); }catch(e){}
+    try{ if(paymentInfo) localStorage.setItem(TRIAL_LOCAL_PAYMENT_KEY, paymentInfo); }catch(e){}
+  }
+  // Shows/hides the lock overlay and due-soon banner purely from a due date
+  // and today's device date — no network call needed to evaluate this.
+  function updateTrialUiFromDue(dueDateStr, contact, paymentInfo){
+    var due = new Date(dueDateStr + "T00:00:00");
+    if(isNaN(due.getTime())){ hideTrialLock(); document.getElementById("licenseBanner").style.display = "none"; refreshRenewalInfoCard(); return; }
+    var graceEnd = new Date(due.getTime());
+    graceEnd.setDate(graceEnd.getDate() + LICENSE_GRACE_DAYS);
+    var now = new Date();
+    if(now > graceEnd){
+      showTrialLock(contact, paymentInfo);
+      document.getElementById("licenseBanner").style.display = "none";
+    }else if(now > due){
+      hideTrialLock();
+      document.getElementById("licenseBannerText").textContent = contact
+        ? (t("licenseDueSoonText") + " " + contact)
+        : t("licenseDueSoonText");
+      document.getElementById("licenseBannerPayment").textContent = paymentInfo ? (" 💳 " + paymentInfo) : "";
+      document.getElementById("licenseBanner").style.display = "";
+    }else{
+      hideTrialLock();
+      document.getElementById("licenseBanner").style.display = "none";
+    }
+    refreshRenewalInfoCard();
+  }
+  // Fills in the read-only "Subscription" card inside Shop Details, so a
+  // customer can check their renewal status and how to pay anytime — not
+  // just when they're already locked out. Only shown on a licensed copy.
+  function refreshRenewalInfoCard(){
+    var card = document.getElementById("renewalInfoCard");
+    if(!LICENSE_KEY || !SELLER_LICENSE_CONFIG){ card.style.display = "none"; return; }
+    var dueDateStr = getOrInitLocalTrialDue();
+    var info = getLocalTrialInfo();
+    var due = new Date(dueDateStr + "T00:00:00");
+    var statusText;
+    if(!isNaN(due.getTime())){
+      var graceEnd = new Date(due.getTime());
+      graceEnd.setDate(graceEnd.getDate() + LICENSE_GRACE_DAYS);
+      var now = new Date();
+      if(now > graceEnd) statusText = "🔴 Locked — due " + dueDateStr;
+      else if(now > due) statusText = "🟡 Renewal due — grace period, due was " + dueDateStr;
+      else statusText = "🟢 Active — valid until " + dueDateStr;
+    }else{
+      statusText = "Status unknown";
+    }
+    card.style.display = "";
+    document.getElementById("renewalInfoStatus").textContent = statusText;
+    document.getElementById("renewalInfoContact").textContent = info.contact ? ("Contact: " + info.contact) : "";
+    document.getElementById("renewalInfoPayment").textContent = info.paymentInfo ? ("💳 " + info.paymentInfo) : "";
+  }
+  // Runs first, before anything else, using only the device's own clock and
+  // local storage — so the trial/lock state is correct even if this device
+  // never has internet access at all.
+  function applyLocalTrialState(){
+    if(!LICENSE_KEY || !SELLER_LICENSE_CONFIG) return;
+    var due = getOrInitLocalTrialDue();
+    var info = getLocalTrialInfo();
+    updateTrialUiFromDue(due, info.contact, info.paymentInfo);
+  }
+  // Opportunistic online sync: if reachable, the seller's Firebase is
+  // authoritative (it's where renewals are set), so pull it down and use it
+  // going forward. If this device has never checked in before, it seeds the
+  // server with its own local trial date instead of overwriting anything.
   function checkLicenseStatus(){
     if(!LICENSE_KEY || !SELLER_LICENSE_CONFIG) return; // disabled — this copy has no license configured
     loadFirebaseSDK(function(){
@@ -1939,19 +2220,36 @@
         var existing = (window.firebase.apps || []).filter(function(a){ return a.name === "licenseApp"; });
         licenseApp = existing.length ? existing[0] : firebase.initializeApp(SELLER_LICENSE_CONFIG, "licenseApp");
         var licenseDb = firebase.database(licenseApp);
-        licenseDb.ref("licenses/" + LICENSE_KEY + "/dueDate").once("value").then(function(snap){
-          var dueDate = snap.val();
-          if(!dueDate) return; // no due date set for this key — say nothing
-          var due = new Date(dueDate + "T00:00:00");
-          if(isNaN(due.getTime())) return;
-          due.setDate(due.getDate() + LICENSE_GRACE_DAYS);
-          if(new Date() > due){
-            document.getElementById("licenseBanner").style.display = "";
+        var licRef = licenseDb.ref("licenses/" + LICENSE_KEY);
+        licRef.once("value").then(function(snap){
+          var val = snap.val() || {};
+          var contact = val.contact || "";
+          var paymentInfo = val.paymentInfo || "";
+          setLocalTrialInfo(contact, paymentInfo);
+          if(!val.dueDate){
+            var localDue = getOrInitLocalTrialDue();
+            licRef.update({ dueDate: localDue, trialStartedOn: todayStr() }).catch(function(){});
+            updateTrialUiFromDue(localDue, contact, paymentInfo);
+            return;
           }
-        }).catch(function(){ /* offline or misconfigured — fail silently, never block */ });
-      }catch(e){ /* fail silently */ }
-    }, function(){ /* SDK failed to load — fail silently */ });
+          // Server is authoritative once reachable (this is where you renew
+          // someone) — sync it locally so future offline sessions on this
+          // device use the up-to-date date too.
+          setLocalTrialDue(val.dueDate);
+          updateTrialUiFromDue(val.dueDate, contact, paymentInfo);
+        }).catch(function(){ /* offline or misconfigured — local check already applied, nothing more to do */ });
+      }catch(e){ /* fail silently — local check already applied */ }
+    }, function(){ /* SDK failed to load — local check already applied */ });
   }
+  document.getElementById("trialLockedRecheckBtn").addEventListener("click", function(){
+    var btn = document.getElementById("trialLockedRecheckBtn");
+    var lbl = document.getElementById("trialLockedRecheckLabel");
+    var original = lbl.textContent;
+    lbl.textContent = "…";
+    btn.disabled = true;
+    checkLicenseStatus();
+    setTimeout(function(){ lbl.textContent = original; btn.disabled = false; }, 1500);
+  });
 
   // ---------- Cloud Sync (Firebase) ----------
   function loadSyncConfig(){
@@ -2459,7 +2757,7 @@
     btn.addEventListener("click", function(){ hideOverlay(this.getAttribute("data-close")); });
   });
   document.querySelectorAll(".overlay").forEach(function(ov){
-    if(ov.id === "loginOverlay") return;
+    if(ov.id === "loginOverlay" || ov.id === "trialLockedOverlay") return;
     ov.addEventListener("click", function(e){ if(e.target === ov) ov.classList.remove("show"); });
   });
 
@@ -2549,6 +2847,7 @@
   // ---------- Init ----------
   function renderAll(){ applyDueDateFlips(); renderTabs(); renderSummary(); renderGrid(); }
 
+  applyLocalTrialState();
   loadAll();
   document.getElementById("shopNameInput").value = state.settings.shopName || "My Cable TV Network";
   applyLanguage();

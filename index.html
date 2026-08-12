@@ -1644,12 +1644,19 @@
     if(!name){ alert("Please enter the customer name."); return; }
     var isNew = !state.data[id];
     var prev = state.data[id] || {};
+    var wasAlreadyPaid = prev.status === "paid";
     var collectorVal = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("fCollector").value;
     // If marking Paid and the Last Paid Date box was left empty, default it to
     // today rather than leaving it blank — this is the date the Report will
-    // file the collection under.
+    // file the collection under. But only do this when this save is actually
+    // what's marking the customer paid for the first time. If they were
+    // already Paid and someone is just editing another detail (mobile,
+    // notes, etc.) with this field left blank, keep their existing paid
+    // date instead of counting this edit as a fresh payment collected today.
     var lastPaidVal = document.getElementById("fLastPaid").value;
-    if(pendingStatus === "paid" && !lastPaidVal){ lastPaidVal = todayStr(); }
+    if(pendingStatus === "paid" && !lastPaidVal){
+      lastPaidVal = wasAlreadyPaid ? (prev.lastPaid || prev.paidRecordedOn || todayStr()) : todayStr();
+    }
     state.data[id] = Object.assign({}, prev, {
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
       lastPaid: lastPaidVal,
@@ -2076,8 +2083,10 @@
 
   // ---------- Report / Pie chart ----------
   // fromDate/toDate: optional "YYYY-MM-DD" strings (inclusive range). When
-  // set, collection totals (cash/upi/office/byStaff) only include customers
-  // whose recorded paid date falls within [fromDate, toDate]. Paid/unpaid/
+  // set, collection totals (cash/upi/office/byStaff) only include "paid"
+  // activity-log entries whose date falls within [fromDate, toDate] — the
+  // same records the Collection Details table and Activity Log show, so the
+  // total can never disagree with what's listed underneath it. Paid/unpaid/
   // suspended status counts always reflect current live status (status
   // itself has no date range).
   function computeStatusCounts(fromDate, toDate){
@@ -2088,22 +2097,24 @@
     Object.keys(state.data).forEach(function(id){
       if(!isBoxVisible(id)) return;
       var c = state.data[id];
-      var amt = Number(c.lastPaidAmount != null ? c.lastPaidAmount : c.amount)||0;
-      if(c.status === "paid"){
-        paid++;
-        var recordedOn = c.paidRecordedOn || c.lastPaid;
-        var inRange = (!fromDate && !toDate) ||
-          ((!fromDate || recordedOn >= fromDate) && (!toDate || recordedOn <= toDate));
-        var who = c.collector || "";
-        if(staffOnly && who === "Office") inRange = false; // office's own collections stay out of a staff member's report
-        if(inRange){
-          if(c.mode === "upi") upi += amt;
-          else cash += amt;
-          if(who){ byStaff[who] = (byStaff[who]||0) + amt; }
-          if(who === "Office") office += amt;
-        }
-      }else if(c.status === "unpaid"){ unpaid++; }
+      if(c.status === "paid"){ paid++; }
+      else if(c.status === "unpaid"){ unpaid++; }
       else if(c.status === "suspended"){ suspended++; }
+    });
+    state.activityLog.forEach(function(e){
+      if(e.action !== "paid") return;
+      if(!isBoxVisible(e.box)) return;
+      if(staffOnly && e.actor === "Office") return; // office's own collections stay out of a staff member's report
+      var day = reportDayStr(e.time);
+      if(fromDate && day < fromDate) return;
+      if(toDate && day > toDate) return;
+      var amt = e.meta && e.meta.amount != null ? e.meta.amount : (parseFloat((e.extra||"").replace(/[^\d.]/g,"")) || 0);
+      var mode = e.meta && e.meta.mode ? e.meta.mode : "cash";
+      var who = (e.meta && e.meta.collector) ? e.meta.collector : e.actor;
+      if(mode === "upi") upi += amt;
+      else cash += amt;
+      if(who){ byStaff[who] = (byStaff[who]||0) + amt; }
+      if(who === "Office") office += amt;
     });
     return { paid:paid, unpaid:unpaid, suspended:suspended, cash:cash, upi:upi, office:office, byStaff:byStaff, total: paid+unpaid+suspended };
   }

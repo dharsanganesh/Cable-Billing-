@@ -759,15 +759,31 @@
 (function(){
   "use strict";
 
-  var DATA_KEY = "cabletv_billing_data_v1";
-  var SETTINGS_KEY = "cabletv_billing_settings_v1";
-  var INVOICE_KEY = "cabletv_billing_invoice_seq_v1";
-  var CATEGORIES_KEY = "cabletv_billing_categories_v1";
-  var STAFF_KEY = "cabletv_billing_staff_v1";
-  var SYNC_CONFIG_KEY = "cabletv_billing_sync_config_v1";
-  var SESSION_KEY = "cabletv_billing_session_v1";
-  var ACTIVITY_KEY = "cabletv_billing_activity_v1";
-  var LANG_KEY = "cabletv_billing_lang_v1";
+  // License key must be resolved BEFORE any storage keys are built, since
+  // every piece of storage below is scoped by it. This is what keeps your
+  // own data and every customer's data completely separate — even though
+  // github.io hosts every repo under your username on the same origin,
+  // which would otherwise mean everything shares one pool of storage.
+  var SELLER_LICENSE_CONFIG = null; // e.g. { apiKey:"...", databaseURL:"...", ... }
+  var LICENSE_KEY = ""; // e.g. "shivashankar-supreme-fiber" — or leave blank and use ?key= in the URL instead
+  try{
+    var urlLicenseKey = new URLSearchParams(window.location.search).get("key");
+    if(urlLicenseKey) LICENSE_KEY = urlLicenseKey;
+  }catch(e){}
+  // Empty for your own unrestricted use (keeps your existing data exactly
+  // where it already is), or "_<key>" for any link with ?key= in it — so
+  // your data, and every customer's data, each get their own private slot.
+  var STORAGE_SUFFIX = LICENSE_KEY ? ("_" + LICENSE_KEY.replace(/[^a-zA-Z0-9\-_]/g, "")) : "";
+
+  var DATA_KEY = "cabletv_billing_data_v1" + STORAGE_SUFFIX;
+  var SETTINGS_KEY = "cabletv_billing_settings_v1" + STORAGE_SUFFIX;
+  var INVOICE_KEY = "cabletv_billing_invoice_seq_v1" + STORAGE_SUFFIX;
+  var CATEGORIES_KEY = "cabletv_billing_categories_v1" + STORAGE_SUFFIX;
+  var STAFF_KEY = "cabletv_billing_staff_v1" + STORAGE_SUFFIX;
+  var SYNC_CONFIG_KEY = "cabletv_billing_sync_config_v1" + STORAGE_SUFFIX;
+  var SESSION_KEY = "cabletv_billing_session_v1" + STORAGE_SUFFIX;
+  var ACTIVITY_KEY = "cabletv_billing_activity_v1" + STORAGE_SUFFIX;
+  var LANG_KEY = "cabletv_billing_lang_v1" + STORAGE_SUFFIX;
 
   // ---------- AMC / License check (optional, off by default) ----------
   // This is SEPARATE from the shop's own Cloud Sync Firebase — it never touches
@@ -792,18 +808,11 @@
   // your license Firebase and gives them LICENSE_TRIAL_MONTHS from that date.
   // To renew someone, use "Prepare Customer Copy" > Set/Extend Due Date — no
   // new file or link needed, their copy unlocks itself next time it's online.
-  var SELLER_LICENSE_CONFIG = null; // e.g. { apiKey:"...", databaseURL:"...", ... }
-  var LICENSE_KEY = ""; // e.g. "shivashankar-supreme-fiber" — or leave blank and use ?key= in the URL instead
-  try{
-    var urlLicenseKey = new URLSearchParams(window.location.search).get("key");
-    if(urlLicenseKey) LICENSE_KEY = urlLicenseKey;
-  }catch(e){}
   var LICENSE_TRIAL_MONTHS = 3;
   var LICENSE_GRACE_DAYS = 7;
-  var TRIAL_KEY_SUFFIX = LICENSE_KEY ? ("_" + LICENSE_KEY) : "";
-  var TRIAL_LOCAL_DUE_KEY = "cabletv_billing_trial_local_due_v1" + TRIAL_KEY_SUFFIX;
-  var TRIAL_LOCAL_CONTACT_KEY = "cabletv_billing_trial_local_contact_v1" + TRIAL_KEY_SUFFIX;
-  var TRIAL_LOCAL_PAYMENT_KEY = "cabletv_billing_trial_local_payment_v1" + TRIAL_KEY_SUFFIX;
+  var TRIAL_LOCAL_DUE_KEY = "cabletv_billing_trial_local_due_v1" + STORAGE_SUFFIX;
+  var TRIAL_LOCAL_CONTACT_KEY = "cabletv_billing_trial_local_contact_v1" + STORAGE_SUFFIX;
+  var TRIAL_LOCAL_PAYMENT_KEY = "cabletv_billing_trial_local_payment_v1" + STORAGE_SUFFIX;
 
   var DEFAULT_CATEGORIES = [
     { code:"U", max:200 },

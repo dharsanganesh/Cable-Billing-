@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cable TV Billing Manager</title>
+<meta name="theme-color" content="#0f2a3f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cable Billing">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230f2a3f'/%3E%3Ctext x='50' y='64' font-family='Arial,Helvetica,sans-serif' font-size='38' font-weight='800' fill='%23c76b3c' text-anchor='middle'%3ETV%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230f2a3f'/%3E%3Ctext x='50' y='64' font-family='Arial,Helvetica,sans-serif' font-size='38' font-weight='800' fill='%23c76b3c' text-anchor='middle'%3ETV%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Cable%20TV%20Billing%20Manager%22%2C%22short_name%22%3A%22Cable%20Billing%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23eef1f4%22%2C%22theme_color%22%3A%22%230f2a3f%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%3D%25270%25200%2520100%2520100%2527%253E%253Crect%2520width%3D%2527100%2527%2520height%3D%2527100%2527%2520rx%3D%252720%2527%2520fill%3D%2527%25230f2a3f%2527%2F%253E%253Ctext%2520x%3D%252750%2527%2520y%3D%252764%2527%2520font-family%3D%2527Arial%252CHelvetica%252Csans-serif%2527%2520font-size%3D%252738%2527%2520font-weight%3D%2527800%2527%2520fill%3D%2527%2523c76b3c%2527%2520text-anchor%3D%2527middle%2527%253ETV%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 <style>
   :root{
     --navy:#0f2a3f; --navy-2:#16405e; --slate:#3b4a5a; --bg:#eef1f4; --card-bg:#ffffff;
@@ -195,6 +203,7 @@
     <button class="btn btn-ghost" id="syncBtn">☁ <span id="syncStatusDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8b98a5;margin-left:2px;"></span> <span id="syncBtnLabel">Cloud Sync</span></button>
     <button class="btn btn-ghost" id="reportBtn">📊 Report</button>
     <button class="btn btn-ghost" id="activityBtn">🕒 <span id="activityBtnLabel">Activity</span></button>
+    <button class="btn btn-ghost" id="manualBtn">📖 <span id="manualBtnLabel">Manual</span></button>
     <button class="btn btn-ghost" id="staffBtn">👤 Staff</button>
     <button class="btn btn-ghost" id="settingsBtn">⚙ Shop Details</button>
     <button class="btn btn-ghost" id="exportBtn">⬇ Backup</button>
@@ -698,6 +707,16 @@
   </div>
 </div>
 
+<!-- User Manual -->
+<div class="overlay" id="manualOverlay">
+  <div class="modal wide">
+    <button class="close-x" data-close="manualOverlay">✕</button>
+    <h2 id="manualTitle">User Manual</h2>
+    <div class="sub" id="manualSub">How to use this app</div>
+    <div id="manualBody" style="max-height:520px;overflow-y:auto;line-height:1.55;font-size:13.5px;"></div>
+  </div>
+</div>
+
 <!-- Cloud Sync Modal -->
 <div class="overlay" id="syncOverlay">
   <div class="modal wide">
@@ -844,6 +863,7 @@
       linesUsed:"used", updateLineBtn:"Update", invalidMax:"Please enter a valid number.",
       maxTooSmall:"This line already has {n} customers — the maximum can't be set lower than that.",
       activityBtnLabel:"Activity", activityTitle:"Activity Log", activitySub:"Recent changes made in this app",
+      manualBtnLabel:"Manual", manualTitle:"User Manual", manualSub:"How to use this app",
       actionAdded:"Added customer", actionUpdated:"Updated customer", actionRemoved:"Removed customer", actionPaid:"Marked Paid", actionAutoUnpaid:"Auto-marked Unpaid (due date passed)",
       noActivity:"No activity recorded yet.",
       lblActivityFrom:"From", lblActivityTo:"To", activityClearBtn:"Show All", activityDownloadBtn:"⬇ Download",
@@ -921,6 +941,7 @@
       linesUsed:"பயன்பாட்டில்", updateLineBtn:"புதுப்பி", invalidMax:"சரியான எண்ணை உள்ளிடவும்.",
       maxTooSmall:"இந்த வரிசையில் ஏற்கனவே {n} வாடிக்கையாளர்கள் உள்ளனர் — அதற்கும் குறைவாக அமைக்க முடியாது.",
       activityBtnLabel:"செயல்பாடு", activityTitle:"செயல்பாட்டு பதிவு", activitySub:"இந்த பயன்பாட்டில் சமீபத்திய மாற்றங்கள்",
+      manualBtnLabel:"கையேடு", manualTitle:"பயனர் கையேடு", manualSub:"இந்த ஆப்பை எப்படி பயன்படுத்துவது",
       actionAdded:"வாடிக்கையாளர் சேர்க்கப்பட்டார்", actionUpdated:"வாடிக்கையாளர் புதுப்பிக்கப்பட்டார்", actionRemoved:"வாடிக்கையாளர் நீக்கப்பட்டார்", actionPaid:"செலுத்தியதாக குறிக்கப்பட்டது", actionAutoUnpaid:"தானாக செலுத்தாதது எனக் குறிக்கப்பட்டது",
       noActivity:"இன்னும் செயல்பாடுகள் பதிவு செய்யப்படவில்லை.",
       lblActivityFrom:"தொடக்கம்", lblActivityTo:"முடிவு", activityClearBtn:"அனைத்தும் காட்டு", activityDownloadBtn:"⬇ பதிவிறக்கு",
@@ -933,6 +954,49 @@
       licenseDueSoonText:"உங்கள் சந்தா விரைவில் புதுப்பிக்கப்பட வேண்டும் — தொடர்பு கொள்ளவும்"
     }
   };
+
+  var MANUAL_SECTIONS = {
+    en: [
+      { h:"Signing In", p:"Office signs in with the Office PIN (default 1234, change it in Shop Details) and can see and do everything. Staff sign in with their own name and PIN, and only see the lines (A, B, U, etc.) assigned to them." },
+      { h:"Adding a Customer", p:"Tap any empty grey box (marked +) to add a customer there. Fill in their name, mobile number, plan amount, and payment status, then Save Customer." },
+      { h:"Marking a Payment (Billing)", p:"Tap \"Mark Paid\" on a customer's box. Choose how many months they're paying for, confirm the amount and mode (Cash/UPI), then tap Cash or UPI to record it. This is the proper way to bill someone — it updates their due date and shows up correctly in Reports." },
+      { h:"Editing a Customer", p:"Tap anywhere on a customer's box to open their details, change any field, and Save. You'll also see their full Payment History here — every past payment, with date, amount, mode and who collected it." },
+      { h:"Sending a Bill", p:"Tap \"Bill\" on a customer's box to preview their receipt. From there you can Print it, Send on WhatsApp, Send SMS, or Share to a print app." },
+      { h:"Collection Report", p:"Tap 📊 Report to see totals, a Paid/Unpaid/Suspended chart, and a full list of every payment collected — filterable by date range (Today, Last 7 Days, etc.) and downloadable as a CSV file." },
+      { h:"Activity Log", p:"Tap 🕒 Activity to see a full history of every add, edit, removal, and payment made in the app, with who did it and when." },
+      { h:"Managing Staff", p:"(Office only) Tap 👤 Staff to add staff members, set their PIN, and choose which lines each one can see and bill." },
+      { h:"Managing Lines", p:"(Office only) Tap the ➕ next to your line tabs to add a new line (like a new B or C series) or change how many customer slots a line has." },
+      { h:"Cloud Sync", p:"(Office only) Tap ☁ Cloud Sync to connect your office computer and staff phones to the same live data, so everyone always sees up-to-date information. This needs a one-time Firebase setup — ask if you need help." },
+      { h:"Backup & Restore", p:"(Office only) Tap ⬇ Backup regularly to save a copy of all your data as a file. If anything ever goes wrong, use ⬆ Restore to bring it back." },
+      { h:"Adding This App to Your Home Screen", p:"On Android (Chrome): tap the ⋮ menu in the top-right of your browser, then \"Add to Home screen\" or \"Install app\". On iPhone (Safari): tap the Share icon, then \"Add to Home Screen\". Once added, it opens like a regular app, without the browser's address bar." }
+    ],
+    ta: [
+      { h:"உள்நுழைவது", p:"ஆஃபீஸ் தன் PIN-ஐ பயன்படுத்தி உள்நுழையலாம் (இயல்பு 1234, கடை விவரங்களில் மாற்றலாம்) — எல்லாவற்றையும் பார்க்க/செய்ய முடியும். ஊழியர்கள் தங்கள் பெயர் மற்றும் PIN மூலம் உள்நுழைந்து, தங்களுக்கு ஒதுக்கப்பட்ட வரிசைகளை (A, B, U போன்றவை) மட்டுமே பார்க்க முடியும்." },
+      { h:"வாடிக்கையாளரைச் சேர்ப்பது", p:"காலியான சாம்பல் நிற பாக்ஸை (+ குறியுடன்) தட்டி புதிய வாடிக்கையாளரைச் சேர்க்கவும். பெயர், மொபைல் எண், திட்ட தொகை, கட்டண நிலை பூர்த்தி செய்து Save Customer தட்டவும்." },
+      { h:"கட்டணம் வசூலிப்பது (பில்லிங்)", p:"வாடிக்கையாளர் பாக்ஸில் \"Mark Paid\" தட்டவும். எத்தனை மாதங்களுக்கு செலுத்துகிறார் என தேர்ந்தெடுத்து, தொகை மற்றும் முறையை (Cash/UPI) உறுதிசெய்து, Cash அல்லது UPI தட்டவும். இதுவே சரியான பில்லிங் முறை — இது அடுத்த செலுத்த வேண்டிய தேதியை புதுப்பித்து, அறிக்கையில் சரியாக காட்டும்." },
+      { h:"வாடிக்கையாளரைத் திருத்துவது", p:"வாடிக்கையாளர் பாக்ஸை தட்டி விவரங்களைத் திருத்தி Save செய்யலாம். இங்கே அவரின் முழு கட்டண வரலாறும் (தேதி, தொகை, முறை, யார் வசூலித்தார்) காணலாம்." },
+      { h:"பில் அனுப்புவது", p:"வாடிக்கையாளர் பாக்ஸில் \"Bill\" தட்டி ரசீதை பார்க்கலாம். அங்கிருந்து Print, WhatsApp, SMS, அல்லது வேறு பிரிண்ட் ஆப்பிற்கு பகிரலாம்." },
+      { h:"வசூல் அறிக்கை", p:"📊 Report தட்டி மொத்த வசூல், Paid/Unpaid/Suspended விவரம், மற்றும் ஒவ்வொரு கட்டணத்தின் முழு பட்டியலையும் காணலாம் — தேதி வாரியாக வடிகட்டி CSV ஆக பதிவிறக்கம் செய்யலாம்." },
+      { h:"செயல்பாட்டு பதிவு", p:"🕒 Activity தட்டி இந்த ஆப்பில் நடந்த ஒவ்வொரு சேர்த்தல், திருத்தம், நீக்கம், கட்டணம் ஆகியவற்றின் முழு பதிவையும் — யார், எப்போது செய்தார் என்பதுடன் காணலாம்." },
+      { h:"ஊழியர்களை நிர்வகிப்பது", p:"(ஆஃபீஸ் மட்டும்) 👤 Staff தட்டி ஊழியர்களைச் சேர்த்து, PIN அமைத்து, அவர்கள் பார்க்கக்கூடிய வரிசைகளை தேர்ந்தெடுக்கலாம்." },
+      { h:"வரிசைகளை நிர்வகிப்பது", p:"(ஆஃபீஸ் மட்டும்) வரிசை tab-களுக்கு அருகில் உள்ள ➕ தட்டி புதிய வரிசை (B, C போன்றவை) சேர்க்கலாம் அல்லது ஒரு வரிசையின் எண்ணிக்கையை மாற்றலாம்." },
+      { h:"கிளவுட் சின்க்", p:"(ஆஃபீஸ் மட்டும்) ☁ Cloud Sync தட்டி உங்கள் ஆஃபீஸ் கணினி மற்றும் ஊழியர் மொபைல்களை ஒரே நேரடி தரவுடன் இணைக்கலாம். இதற்கு ஒருமுறை Firebase அமைப்பு தேவை — உதவி தேவைப்பட்டால் கேளுங்கள்." },
+      { h:"காப்புப்பிரதி & மீட்டமை", p:"(ஆஃபீஸ் மட்டும்) தவறாமல் ⬇ Backup தட்டி உங்கள் தரவை ஒரு கோப்பாக சேமிக்கவும். ஏதேனும் தவறு நேர்ந்தால், ⬆ Restore மூலம் மீட்டெடுக்கலாம்." },
+      { h:"இந்த ஆப்பை Home Screen-ல் சேர்ப்பது", p:"Android (Chrome): உலாவியின் மேல்-வலது ⋮ மெனுவைத் தட்டி \"Add to Home screen\" அல்லது \"Install app\" தேர்ந்தெடுக்கவும். iPhone (Safari): Share ஐகானைத் தட்டி \"Add to Home Screen\" தேர்ந்தெடுக்கவும். சேர்த்தபின், இது ஒரு சாதாரண ஆப் போல திறக்கும், முகவரி பட்டி இல்லாமல்." }
+    ]
+  };
+  function renderManual(){
+    var sections = MANUAL_SECTIONS[state.lang] || MANUAL_SECTIONS.en;
+    var html = sections.map(function(s){
+      return "<div style='font-weight:800;color:var(--navy);margin:14px 0 4px;font-size:14px;'>" + escapeHtml(s.h) + "</div>" +
+        "<div style='color:var(--ink);'>" + escapeHtml(s.p) + "</div>";
+    }).join("");
+    document.getElementById("manualBody").innerHTML = html;
+  }
+  document.getElementById("manualBtn").addEventListener("click", function(){
+    renderManual();
+    showOverlay("manualOverlay");
+  });
 
   var state = {
     data: {},
@@ -1089,6 +1153,10 @@
     document.getElementById("loginHint").textContent = t("loginHint");
     document.getElementById("logoutBtnLabel").textContent = t("logoutBtnLabel");
     document.getElementById("activityBtnLabel").textContent = t("activityBtnLabel");
+    document.getElementById("manualBtnLabel").textContent = t("manualBtnLabel");
+    document.getElementById("manualTitle").textContent = t("manualTitle");
+    document.getElementById("manualSub").textContent = t("manualSub");
+    if(document.getElementById("manualOverlay").classList.contains("show")) renderManual();
     document.getElementById("activityTitle").textContent = t("activityTitle");
     document.getElementById("activitySub").textContent = t("activitySub");
     document.getElementById("lblActivityFrom").textContent = t("lblActivityFrom");

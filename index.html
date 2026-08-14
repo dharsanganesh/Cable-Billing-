@@ -258,7 +258,11 @@
   <div class="modal">
     <button class="close-x" data-close="customerOverlay">✕</button>
     <h2 id="custModalTitle">Add Customer</h2>
-    <div class="sub" id="custModalSub">Box —</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:4px;">
+      <button class="btn btn-sm btn-outline" id="custPrevBtn" title="Previous box">◀</button>
+      <div class="sub" id="custModalSub" style="margin-bottom:0;">Box —</div>
+      <button class="btn btn-sm btn-outline" id="custNextBtn" title="Next box">▶</button>
+    </div>
 
     <div class="field">
       <label id="lblName">Customer Name</label>
@@ -1817,10 +1821,28 @@
         "</div>";
     }).join("");
   }
+  function updateCustNavButtons(id){
+    var prevBtn = document.getElementById("custPrevBtn");
+    var nextBtn = document.getElementById("custNextBtn");
+    var code = categoryCodeOfId(id);
+    var cat = code ? state.categories.filter(function(c){ return c.code === code; })[0] : null;
+    if(!cat){ prevBtn.style.display = "none"; nextBtn.style.display = "none"; return; }
+    prevBtn.style.display = ""; nextBtn.style.display = "";
+    var num = parseInt(id.slice(code.length), 10);
+    var prevId = code + (num - 1);
+    var nextId = code + (num + 1);
+    prevBtn.disabled = num <= 1;
+    prevBtn.style.opacity = num <= 1 ? "0.4" : "1";
+    prevBtn.onclick = function(){ if(num > 1) openCustomerModal(prevId, state.data[prevId] || null); };
+    nextBtn.disabled = num >= cat.max;
+    nextBtn.style.opacity = num >= cat.max ? "0.4" : "1";
+    nextBtn.onclick = function(){ if(num < cat.max) openCustomerModal(nextId, state.data[nextId] || null); };
+  }
   function openCustomerModal(id, c){
     state.activeBox = id;
     document.getElementById("custModalTitle").textContent = c ? t("editTitle") : t("addTitle");
     document.getElementById("custModalSub").textContent = t("boxLabel") + " " + id;
+    updateCustNavButtons(id);
     document.getElementById("fName").value = c ? c.name || "" : "";
     document.getElementById("fMobile").value = c ? c.mobile || "" : "";
     document.getElementById("fAmount").value = c ? c.amount || "" : "";

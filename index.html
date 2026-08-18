@@ -1983,10 +1983,11 @@
     if(pendingStatus === "paid" && !lastPaidVal){
       lastPaidVal = wasAlreadyPaid ? (prev.lastPaid || prev.paidRecordedOn || todayStr()) : todayStr();
     }
+    var dueDateVal = document.getElementById("fDueDate").value;
     state.data[id] = Object.assign({}, prev, {
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
       lastPaid: lastPaidVal,
-      dueDate: document.getElementById("fDueDate").value,
+      dueDate: dueDateVal,
       stb: document.getElementById("fStb").value.trim(),
       mode: document.getElementById("fMode").value,
       collector: collectorVal,
@@ -1998,6 +1999,17 @@
     if(pendingStatus === "paid"){
       state.data[id].lastPaidAmount = Number(amount) || 0;
       state.data[id].paidRecordedOn = lastPaidVal;
+      // The printed receipt shows "For the Period" using periodFrom/periodTo,
+      // which normally only get set by the Mark Paid popup. If Last Paid /
+      // Next Due were instead edited right here on the customer form, keep
+      // the receipt period in step with what was just typed — otherwise it
+      // would keep showing whatever period was last recorded via Mark Paid,
+      // even though the dates on screen have moved on.
+      var datesChanged = lastPaidVal !== prev.lastPaid || dueDateVal !== prev.dueDate;
+      if(datesChanged){
+        state.data[id].periodFrom = prev.dueDate || prev.periodTo || prev.lastPaid || lastPaidVal;
+        state.data[id].periodTo = dueDateVal || lastPaidVal;
+      }
     }
     var statusLabelKeys = { paid:"optPaid", unpaid:"optUnpaid", suspended:"optSuspended" };
     logActivity(isNew ? "added" : "updated", id, name, fmtMoney(amount) + " · " + t(statusLabelKeys[pendingStatus] || "optUnpaid"));

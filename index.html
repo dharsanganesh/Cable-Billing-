@@ -1166,7 +1166,10 @@
     session: null,
     activityLog: []
   };
-  var fbApp = null, fbDb = null, syncRef = null, syncEnabled = false, isApplyingRemote = false;
+  var fbApp = null, fbDb = null, syncRefs = {}, syncEnabled = false, isApplyingRemote = false;
+  var applyingRemoteCount = 0;
+  function beginApplyingRemote(){ applyingRemoteCount++; isApplyingRemote = true; }
+  function endApplyingRemote(){ applyingRemoteCount = Math.max(0, applyingRemoteCount - 1); isApplyingRemote = applyingRemoteCount > 0; }
 
   function t(key){ return (I18N[state.lang] && I18N[state.lang][key] !== undefined) ? I18N[state.lang][key] : I18N.en[key]; }
 
@@ -1214,11 +1217,26 @@
     if(state.session) localStorage.setItem(SESSION_KEY, JSON.stringify(state.session));
     else localStorage.removeItem(SESSION_KEY);
   }
-  function saveData(){ localStorage.setItem(DATA_KEY, JSON.stringify(state.data)); pushToCloud(); }
-  function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); pushToCloud(); }
-  function saveCategories(){ localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories)); pushToCloud(); }
-  function saveStaff(){ localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff)); pushToCloud(); }
-  function saveActivity(){ localStorage.setItem(ACTIVITY_KEY, JSON.stringify(state.activityLog)); pushToCloud(); }
+  // Each save*() function persists locally right away, then pushes only the
+  // piece that changed to the cloud (when connected). This matters a lot
+  // once two devices are syncing: if every save pushed the WHOLE dataset,
+  // whichever device saved last would silently overwrite every OTHER
+  // customer's data too — including changes the other device made seconds
+  // earlier that this device hasn't even pulled down yet. Scoping each push
+  // to just the customer/entry that changed means two devices editing
+  // different customers at the same time both survive.
+  function saveData(ids){
+    localStorage.setItem(DATA_KEY, JSON.stringify(state.data));
+    if(!ids) return;
+    (Array.isArray(ids) ? ids : [ids]).forEach(function(id){ pushCustomerToCloud(id); });
+  }
+  function saveSettings(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); pushSettingsToCloud(); }
+  function saveCategories(){ localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories)); pushCategoriesToCloud(); }
+  function saveStaff(){ localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff)); pushStaffToCloud(); }
+  function saveActivity(entry){
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(state.activityLog));
+    if(entry) pushActivityEntryToCloud(entry);
+  }
   function logActivity(action, boxId, customerName, extra, meta){
     var actor = "Unknown";
     if(state.session){ actor = state.session.role === "office" ? "Office" : state.session.staffName; }
@@ -1226,7 +1244,7 @@
     if(meta) entry.meta = meta;
     state.activityLog.unshift(entry);
     if(state.activityLog.length > 300){ state.activityLog = state.activityLog.slice(0, 300); }
-    saveActivity();
+    saveActivity(entry);
     return entry;
   }
   function saveLang(){ localStorage.setItem(LANG_KEY, state.lang); }
@@ -1817,7 +1835,7 @@
     var today = todayStr();
     document.getElementById("modeDatePaid").value = today;
     document.getElementById("modeCurrentDateDisplay").value = new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
-    var periodStart = c.dueDate || c.lastPaid || today;
+    var periodStart = (c.dueDate && c.dueDate > today) ? c.dueDate : today;
     document.getElementById("modePeriodFrom").value = periodStart;
     document.getElementById("modeNotes").value = "";
     modeAmountTouched = false; modeToTouched = false;
@@ -1838,6 +1856,13 @@
       var collectedAmt = Number(document.getElementById("modeAmountReceived").value) || 0;
       var periodFrom = document.getElementById("modePeriodFrom").value || c.dueDate || c.lastPaid || todayStr();
       var periodTo = document.getElementById("modePeriodTo").value || addMonthsToDate(periodFrom, months);
+      var todayNow = todayStr();
+      // Marking someone Paid should never leave them with a due date that's
+      // already in the past — that would make the daily due-date check flip
+      // them straight back to Unpaid, so the box would never actually stay
+      // green. If the computed/entered period lands on or before today,
+      // push it out by the same number of months, counted from today instead.
+      if(periodTo <= todayNow){ periodTo = addMonthsToDate(todayNow, months); }
       var datePaid = document.getElementById("modeDatePaid").value || todayStr();
       // Snapshot exactly how this customer looked right before this payment, so
       // Office can undo just this one transaction later if it was entered wrong.
@@ -1984,6 +2009,10 @@
       lastPaidVal = wasAlreadyPaid ? (prev.lastPaid || prev.paidRecordedOn || todayStr()) : todayStr();
     }
     var dueDateVal = document.getElementById("fDueDate").value;
+    if(pendingStatus === "paid" && dueDateVal && dueDateVal <= todayStr()){
+      alert("Next Due Date must be a date after today when marking a customer Paid. With today's or an earlier date, this customer will immediately flip back to Unpaid. Please pick a future Next Due Date, or use \"Mark Paid\" on their box instead, which sets this correctly.");
+      return;
+    }
     state.data[id] = Object.assign({}, prev, {
       name:name, mobile:mobile, amount:amount, status:pendingStatus,
       lastPaid: lastPaidVal,
@@ -2698,38 +2727,121 @@
   }
 
   function attachSyncListener(roomId){
-    if(syncRef){ try{ syncRef.off(); }catch(e){} }
-    syncRef = fbDb.ref("cabletv_shops/" + roomId);
-    syncRef.on("value", function(snapshot){
-      var val = snapshot.val();
+    detachSyncListeners();
+    var base = "cabletv_shops/" + roomId;
+
+    syncRefs.data = fbDb.ref(base + "/data");
+    syncRefs.data.on("value", function(snapshot){
       updateSyncStatus("connected");
-      if(!val) return;
-      isApplyingRemote = true;
-      if(val.data) state.data = val.data;
-      if(val.settings) state.settings = Object.assign(state.settings, val.settings);
-      if(val.categories && val.categories.length) state.categories = val.categories;
-      if(val.staff && val.staff.length) state.staff = val.staff;
-      if(val.activityLog && val.activityLog.length) state.activityLog = val.activityLog;
+      beginApplyingRemote();
+      state.data = snapshot.val() || {};
       localStorage.setItem(DATA_KEY, JSON.stringify(state.data));
+      renderAll();
+      endApplyingRemote();
+    }, function(){ updateSyncStatus("error"); });
+
+    syncRefs.settings = fbDb.ref(base + "/settings");
+    syncRefs.settings.on("value", function(snapshot){
+      var val = snapshot.val();
+      if(!val) return;
+      beginApplyingRemote();
+      state.settings = Object.assign(state.settings, val);
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+      document.getElementById("shopNameInput").value = state.settings.shopName || "";
+      renderAll();
+      endApplyingRemote();
+    });
+
+    syncRefs.categories = fbDb.ref(base + "/categories");
+    syncRefs.categories.on("value", function(snapshot){
+      var val = snapshot.val();
+      if(!val || !val.length) return;
+      beginApplyingRemote();
+      state.categories = val;
       localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories));
-      localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff));
-      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(state.activityLog));
-      document.getElementById("shopNameInput").value = state.settings.shopName;
       if(!state.categories.some(function(c){ return c.code === state.activeCat; })){
         state.activeCat = state.categories[0].code;
       }
-      populateStaffDropdowns();
       renderAll();
-      isApplyingRemote = false;
-    }, function(){ updateSyncStatus("error"); });
+      endApplyingRemote();
+    });
+
+    syncRefs.staff = fbDb.ref(base + "/staff");
+    syncRefs.staff.on("value", function(snapshot){
+      var val = snapshot.val();
+      if(!val || !val.length) return;
+      beginApplyingRemote();
+      state.staff = val;
+      localStorage.setItem(STAFF_KEY, JSON.stringify(state.staff));
+      populateStaffDropdowns();
+      endApplyingRemote();
+    });
+
+    syncRefs.activityLog = fbDb.ref(base + "/activityLog");
+    syncRefs.activityLog.on("value", function(snapshot){
+      var val = snapshot.val();
+      if(!val) return;
+      beginApplyingRemote();
+      // Stored as an object keyed by each entry's own id, so two devices'
+      // log entries always coexist instead of one replacing the other.
+      var list = Object.keys(val).map(function(k){ return val[k]; });
+      list.sort(function(a,b){ return (b.time || 0) - (a.time || 0); });
+      state.activityLog = list.slice(0, 300);
+      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(state.activityLog));
+      renderActivityList();
+      endApplyingRemote();
+    });
   }
 
-  function pushToCloud(){
+  function detachSyncListeners(){
+    Object.keys(syncRefs).forEach(function(k){
+      try{ syncRefs[k].off(); }catch(e){}
+    });
+    syncRefs = {};
+  }
+
+  function pushCustomerToCloud(id){
     if(!syncEnabled || !fbDb || isApplyingRemote) return;
     var conf = loadSyncConfig();
     if(!conf) return;
-    var payload = { data: state.data, settings: state.settings, categories: state.categories, staff: state.staff, activityLog: state.activityLog, updatedAt: Date.now() };
+    var val = state.data[id];
+    fbDb.ref("cabletv_shops/" + conf.roomId + "/data/" + id).set(val === undefined ? null : val);
+  }
+  function pushSettingsToCloud(){
+    if(!syncEnabled || !fbDb || isApplyingRemote) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    fbDb.ref("cabletv_shops/" + conf.roomId + "/settings").set(state.settings);
+  }
+  function pushCategoriesToCloud(){
+    if(!syncEnabled || !fbDb || isApplyingRemote) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    fbDb.ref("cabletv_shops/" + conf.roomId + "/categories").set(state.categories);
+  }
+  function pushStaffToCloud(){
+    if(!syncEnabled || !fbDb || isApplyingRemote) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    fbDb.ref("cabletv_shops/" + conf.roomId + "/staff").set(state.staff);
+  }
+  function pushActivityEntryToCloud(entry){
+    if(!syncEnabled || !fbDb || isApplyingRemote) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    fbDb.ref("cabletv_shops/" + conf.roomId + "/activityLog/" + entry.id).set(entry);
+  }
+  // Full-room overwrite — used ONLY for (a) seeding a brand-new empty sync
+  // room with this device's existing local data, and (b) an explicit
+  // "Restore from backup" import, where replacing everything really is what
+  // the person asked for. Never called from normal saves.
+  function pushFullSnapshotToCloud(){
+    if(!syncEnabled || !fbDb) return;
+    var conf = loadSyncConfig();
+    if(!conf) return;
+    var activityById = {};
+    state.activityLog.forEach(function(e){ activityById[e.id] = e; });
+    var payload = { data: state.data, settings: state.settings, categories: state.categories, staff: state.staff, activityLog: activityById, updatedAt: Date.now() };
     fbDb.ref("cabletv_shops/" + conf.roomId).set(payload);
   }
 
@@ -2742,8 +2854,16 @@
         fbDb = firebase.database();
         syncEnabled = true;
         saveSyncConfig({ config:configObj, roomId:roomId, enabled:true });
-        attachSyncListener(roomId);
-        if(!silent){ pushToCloud(); }
+        var baseRef = fbDb.ref("cabletv_shops/" + roomId);
+        baseRef.once("value").then(function(snap){
+          attachSyncListener(roomId);
+          if(!snap.exists()){
+            // Brand-new sync room — seed it with whatever this device already has.
+            pushFullSnapshotToCloud();
+          }
+        }).catch(function(){
+          attachSyncListener(roomId);
+        });
       }catch(err){
         updateSyncStatus("error");
         if(!silent) alert(t("syncErrorMsg"));
@@ -2784,7 +2904,7 @@
     connectSync(configObj, roomId, false);
   });
   document.getElementById("syncDisconnectBtn").addEventListener("click", function(){
-    if(syncRef){ try{ syncRef.off(); }catch(e){} syncRef = null; }
+    detachSyncListeners();
     syncEnabled = false;
     clearSyncConfig();
     updateSyncStatus("off");

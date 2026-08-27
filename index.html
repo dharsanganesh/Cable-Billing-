@@ -222,6 +222,9 @@
   
   @media (max-width:560px){
     .row2{grid-template-columns:1fr;}
+    .row2-tight{grid-template-columns:1fr 1fr !important;gap:6px;}
+    .row2-tight input, .row2-tight select{padding:8px 6px;font-size:13px;}
+    .row2-tight label{font-size:11.5px;}
     .searchbox{min-width:0;flex:1 1 100%;order:-1;width:100%;}
     .searchbox input{min-width:0;}
     header.topbar{padding:10px 12px;}
@@ -532,7 +535,7 @@
         <input id="modeStatusDisplay" type="text" disabled />
       </div>
     </div>
-    <div class="row2">
+    <div class="row2 row2-tight">
       <div class="field">
         <label id="lblModePlanAmount">Plan Amount (₹)</label>
         <input id="modePlanAmountDisplay" type="text" disabled />
@@ -553,7 +556,7 @@
     </div>
     <div class="field">
       <label id="lblModePeriod">For a Period of</label>
-      <div class="row2">
+      <div class="row2 row2-tight">
         <div class="field" style="margin-bottom:0;">
           <label id="lblModeFrom">From</label>
           <input id="modePeriodFrom" type="date" />
@@ -1856,15 +1859,10 @@
     document.getElementById("modePlanAmountDisplay").value = fmtMoney(c.amount);
     var sel = document.getElementById("modeCollectorSelect");
     var field = document.getElementById("modeCollectorField");
+    field.style.display = "none";
     if(state.session && state.session.role === "staff"){
       sel.value = state.session.staffName;
-      field.style.display = "none";
     }else{
-      // Office is doing this billing right now — default to "Office", not
-      // whoever collected this customer's last payment. Office can still
-      // change the dropdown if they're recording a payment a staff member
-      // physically collected, but it should never be silently pre-filled.
-      field.style.display = "";
       sel.value = "Office";
     }
     document.getElementById("modeMonthsSelect").value = "1";
@@ -1889,7 +1887,7 @@
       var id = modePopupTargetId;
       if(!id || !state.data[id]) { hideOverlay("modeOverlay"); return; }
       var c = state.data[id];
-      var collector = (state.session && state.session.role === "staff") ? state.session.staffName : document.getElementById("modeCollectorSelect").value;
+      var collector = (state.session && state.session.role === "staff") ? state.session.staffName : "Office";
       var months = Number(document.getElementById("modeMonthsSelect").value) || 1;
       var collectedAmt = Number(document.getElementById("modeAmountReceived").value) || 0;
 
